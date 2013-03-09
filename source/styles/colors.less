@@ -1,0 +1,75 @@
+// named colors
+@color-black:              #222;
+@color-grey:               #888;
+@color-white:              #fff;
+@color-red:                #ff3200;
+@color-green:              #28f028;
+@color-blue:               #80a0e0;
+@color-yellow:             #ffdc00;
+@color-orange:             #f89406;
+@color-pink:               #c3325f;
+@color-purple:             #7a43b6;
+@color-brown:              #995020;
+
+// accent or theme colors
+@color-accent:             #5080e0;
+
+// positive colors, to be used for principal foreground or auxilary background
+@color-positive:           #444;
+
+// neutral color, between positive and negative
+@color-neutral:            #888;
+
+// negative colors, to be used for principal background or auxilary foreground
+@color-negative:           #eee;
+
+// general state colors
+@color-expose:             @color-orange;
+@color-active:             @color-red;
+@color-disable:            @color-grey;
+@color-error:              @color-red;
+@color-warning:            @color-yellow;
+@color-success:            @color-green;
+@color-information:        @color-blue;
+
+// palette
+@color-accent-weak:        mix(@color-accent, @color-negative, 25%);
+@color-accent-strong:      mix(@color-accent, @color-positive, 25%);
+@color-positive-weak:      mix(@color-positive, @color-negative, 25%);
+@color-positive-strong:    (@color-positive - @color-positive-weak);
+@color-neutral-weak:       mix(@color-neutral, @color-negative, 25%);
+@color-neutral-strong:     mix(@color-neutral, @color-positive, 25%);
+@color-negative-weak:      (@color-negative - @color-negative-strong);
+@color-negative-strong:    mix(@color-negative, @color-positive, 25%);
+@color-expose-weak:        mix(@color-expose, @color-negative, 25%);
+@color-expose-strong:      mix(@color-expose, @color-positive, 25%);
+@color-active-weak:        mix(@color-active, @color-negative, 25%);
+@color-active-strong:      mix(@color-active, @color-positive, 25%);
+@color-disable-weak:       mix(@color-disable, @color-negative, 25%);
+@color-disable-strong:     mix(@color-disable, @color-positive, 25%);
+@color-error-weak:         mix(@color-error, @color-negative, 25%);
+@color-error-strong:       mix(@color-error, @color-positive, 25%);
+@color-warning-weak:       mix(@color-warning, @color-negative, 25%);
+@color-warning-strong:     mix(@color-warning, @color-positive, 25%);
+@color-success-weak:       mix(@color-success, @color-negative, 25%);
+@color-success-strong:     mix(@color-success, @color-positive, 25%);
+@color-information-weak:   mix(@color-information, @color-negative, 25%);
+@color-information-strong: mix(@color-information, @color-positive, 25%);
+
+// colors in components and elements
+/*@color-body-background:
+@color-concave:
+@gradient-concave:
+@color-convex:
+@gradient-convex:
+@color-pop:
+@gradient-pop:
+@color-overlay:
+@gradient-overlay:*/
+@color-input-placeholder:  @color-neutral-weak;
+@color-anchor:             @color-blue;
+@color-anchor-visited:     @color-blue;
+@color-anchor-expose:      @color-expose-weak;
+@color-anchor-active:      @color-active-weak;
+
+.color-anchor-expose { color:@color-expose-weak }
