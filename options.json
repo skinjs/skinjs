@@ -1,0 +1,10 @@
+{
+  "rsync": {
+    "scripts" : {
+      "dest": "../../wordpress/toolzie/wp-content/themes/toolzie/assets/scripts/skin/"
+    },
+    "styles" : {
+      "dest": "../../wordpress/toolzie/wp-content/themes/toolzie/assets/styles/skin/"
+    }
+  }
+}
