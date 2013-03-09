@@ -1,0 +1,43 @@
+{
+  "name": "SKIN.JS",
+  "version": "0.0.0",
+  "description": "Skin is a collection of flexible, customizable and extendable UI components and styles for web applications",
+  "main": "skin.js",
+  "scripts": {
+    "test": "grunt test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skinjs/skinjs.git"
+  },
+  "keywords": [
+    "skinjs",
+    "ui",
+    "gui",
+    "web",
+    "component",
+    "widget",
+    "plugin",
+    "template",
+    "responsive",
+    "mobile",
+    "desktop",
+    "tablet",
+    "design",
+    "minimal",
+    "flexible",
+    "customizable",
+    "extendable",
+    "javascript",
+    "stylesheet",
+    "js",
+    "css",
+    "css3",
+    "less",
+    "html5",
+    "amd"
+  ],
+  "author": "Soheil Jadidian",
+  "license": "MIT",
+  "readmeFilename": "README.md"
+}
