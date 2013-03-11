@@ -65,6 +65,18 @@ module.exports = function(grunt) {
       },
     },
 
+    jshint: {
+      files: ['gruntfile.js', 'source/**/*.js', 'test/**/*.js'],
+      options: {
+        globals: {
+          jQuery: true,
+          console: true,
+          module: true,
+          document: true,
+        },
+      },
+    },
+
     watch: {
       files: "source/**/*",
       tasks: ["less", "rsync:styles", "rsync:scripts"],
