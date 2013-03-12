@@ -10,15 +10,22 @@
 
   // Skin class definition
   // ---------------------
-  var Skin = that.Skin = function() {
+  var Skin = that.Skin = function(options) {
     // private
     // -------
     var options = {};
     var recipes = {};
+    var initialize = function() {
+      // initialize, parse options, load modules
+      console.log('initializing..22');
+      
+    }
     var parseOptionString = function(optionString) {};
     var parseOptions = function(options) {};
     var set = function(key, value) {};
-    var loadModule = function(module) {};
+
+    // execute initialize
+    initialize();
 
     // public interface
     // ----------------
@@ -45,24 +52,32 @@
     // sensor will detect browsers supported events
     // and hooks them into more complex ones
     sense: true,
-    // default method mapping
-    // if null, a default map will be used to jQuery or Zepto methods
-    // otherwise it should be the name of the module which implements mapping
-    // or provides adapter for required methods such as
-    // $(), extend(), addClass(), removeClass(), bind() etc.
-    hooks: null
+    // default method to load modules
+    load: function(name, dependencies, callback) {
+      // based on define() method proposed by CommonJS
+      // for Asynchronous Module Definition (AMD)
+      define(modules);
+    },
+    // default method mapping to other libraries such as
+    // jQuery, Zepto, Backbone, Underscore etc.
+    // also can be the module name which implements mapping
+    // in this case it will be loaded by loader
+    plugin: that.$,
+    select: that.$,
+    extend: that.$.extend
   };
 
   // Skin static methods
   // ----------------------
   // assign cached Skin back and return this object
-  // e.g. var newSkin = Skin.noConflict();
+  // should be at the beginning of other codes
+  // e.g. var NewSkin = Skin.noConflict();
+  //      var newSkin = new NewSkin({alias: 'newSkin'});
   //      var Skin    = { someOtherObject: 'should be defined after Skin.noConflict()' }
   Skin.noConflict = function() {
     that.Skin = oldSkin;
     return this;
   };
-
 
   // View class definition
   // ---------------------
