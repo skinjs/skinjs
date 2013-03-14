@@ -1,12 +1,35 @@
 (function() {
   "use strict";
 
+
   // Module properties
   // -----------------
   // caching references
   // existing Skin is kept as oldSkin
   var root    = this
     , oldSkin = root.Skin;
+
+  // key constants, used in data objects as keys
+  // these shouldn't conflict with actual data keys
+  var INDEX     = '_index_'
+    , PARENT    = '_parent_'
+    , BASE      = '_base_'
+    , ADD       = '_add_'
+    , REMOVE    = '_remove_'
+    , OBSERVERS = '_observers_';
+
+  // shortcuts
+  var Objects   = Object.prototype
+    , Functions = Function.prototype
+    , Arrays    = Array.prototype
+    , slice     = Arrays.slice
+    , has       = Objects.hasOwnProperty;
+
+  // helpers
+  var isObject = function(object) { return typeof(object) === 'object' }
+  var isFunction = function(object) { return typeof(object) === 'function' }
+  var isArray = function(object) { return object instanceof Array }
+
 
   // Skin class definition
   // ---------------------
@@ -23,16 +46,18 @@
         // loader method, should be assigned after parsing the options
       , load = null;
 
-
     // initialize
     var initialize = function() {
+      // initialize data object
+      data[INDEX] = '';
+      data[PARENT] = null;
       // parse options
       parse(options, key, value);
       // assign loader function for internal use
       // TODO: this should be done in update(key, value) after parsing options automatically
       load = options.load;
-      // create the main skin plugin
-      if (options.plug && typeof(options.plug) == 'object') {
+      // create the skin plugin
+      if (options.plug && isObject(options.plug)) {
         options.plug[options.alias] = function(type, options) {
           // the plugin context
           // most probably this refers to an array of elements
@@ -40,7 +65,6 @@
         };
       }
     };
-
 
     // parse and update options recursively
     // the method captures ('option-a option-b'), ('key', value) and ({key: value}) formats
@@ -82,19 +106,13 @@
 
     // helpers for internal use
     // ------------------------
-    // key constants, used in data objects
-    // these shouldn't conflict with actual data keys
-    var INDEX     = '_index_'
-      , PARENT    = '_parent_'
-      , BASE      = '_base_'
-      , ADD       = '_add_'
-      , REMOVE    = '_remove_'
-      , OBSERVERS = '_observers_';
-    // find and return a data object by its path
-    // e.g. var template = dataByPath('hint-hidden-template');
-    var dataByPath = function(path, pointer) {
-      var pointer = pointer || data
-        , keys = path.split(/[.-]/)
+    // find and return a data object by its index path
+    // e.g. var template = getData('hint-hidden-template');
+    //      var template = getData('hint.hidden.template');
+    //      var template = getData(['hint', 'hidden', 'template']);
+    var getData = function(index) {
+      var pointer = data
+        , keys = (isArray(index))? index : index.split(/[.-]/)
         , key = null;
       while (keys.length) {
         key = keys.shift();
@@ -103,34 +121,57 @@
       }
       return pointer;
     }
-    // create path string for a data object
+    // set data object
+    // e.g. setData('hint-hidden-template', newTemplate);
+    //      setData('hint.hidden.template', newTemplate);
+    //      setData(['hint', 'hidden', 'template'], newTemplate);
+    var set = function(key, value) {
+      var pointer = data
+        , keys = (isArray(key))? key : key.split(/[.-]/)
+        , index = [];
+      while (keys.length) {
+        key = keys.shift();
+        index.push(key);
+        // create mode
+        if (!has.call(pointer, key)) {
+          if (keys.length) {
+            pointer[key] = {};
+            pointer[key][INDEX] = index.slice(0);
+          } else {
+            pointer[key] = value;
+          }
+        }
+        pointer = pointer[key];
+      }
+      return pointer;
+    }
+    // create index string for a data object and store it for future use
     // dashes should be used only in HTML markups as classes or data attributes
-    // for internal use paths are divided by dots
-    var pathOfData = function(pointer, path) {
-      var path = path || '';
-      if (typeof(pointer) === 'object' && pointer.hasOwnProperty(INDEX)) {}
-      
+    // for internal use, index paths are divided by dots
+    var getIndex = function(pointer) {
+      if (typeof(pointer) === 'object' && pointer.hasOwnProperty(INDEX)) { return pointer[INDEX]; }
+      else {
+        var path = '';
+        // TODO: this
+      }
     }
-
-    // check if a delegate can perform an action
-    var can = function(delegate, action) {
-      if (delegate && delegate.hasOwnProperty(action) && typeof(delegate[action]) === 'function') return true;
-      return false;
-    }
-
-    // ask chain of delegates to perform an action
+    // chain of responsibility, ask delegates to perform something if they can
+    var can = function(object, action) { return has.call(object, action) && isFunction(object[action]) }
     var ask = function(action) {
-      if (can(this, action)) return this[action].apply(this, Array.prototype.slice.call(arguments, 1));
+      if (can(this, action)) return this[action].apply(this, slice.call(arguments, 1));
       else for(var count in options.delegates) {
         var delegate = options.delegates[count];
-        if (can(delegate, action)) return delegate[action].apply(this, Array.prototype.slice.call(arguments, 1));
+        if (can(delegate, action)) return delegate[action].apply(this, slice.call(arguments, 1));
       }
       return false;
-    };
+    }
 
 
     // execute initialize
     initialize();
+
+    set('a.b.c.d', [1,2,3,4]);
+    console.log(data);
 
 
     // public interface
