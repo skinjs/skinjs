@@ -61,12 +61,9 @@
               base = source[key]['base'] || source[key];
                 // means the branch is based on other branch
                 // this should be passed and set in target
-              }
-              // first, check for update methods
-              if (source[key]['method']) {
-                
-              }
-              if (!target.hasOwnProperty(key)) target[key] = {};
+                // first, check for update methods
+              if (source[key]['method']) {}
+              if (!target.hasOwnProperty(key)) target[key] = {}
               parse(target[key], source[key]);
             }
           }
@@ -111,7 +108,7 @@
     // for internal use paths are divided by dots
     var pathOfData = function(pointer, path) {
       var path = path || '';
-      if (typeof(pointer) === 'object' && pointer.hasOwnProperty(INDEX)
+      if (typeof(pointer) === 'object' && pointer.hasOwnProperty(INDEX)) {}
       
     }
 
