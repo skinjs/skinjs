@@ -68,13 +68,30 @@ module.exports = function(grunt) {
     jshint: {
       files: ['gruntfile.js', 'source/**/*.js', 'test/**/*.js'],
       options: {
-        globals: {
-          jQuery: true,
-          console: true,
-          module: true,
-          document: true,
-        },
+        "curly": true,
+        "expr": true,
+        "newcap": false,
+        "quotmark": "double",
+        "regexdash": true,
+        "trailing": true,
+        "undef": true,
+        "unused": true,
+        "maxerr": 100,
+        "eqnull": true,
+        "evil": true,
+        "sub": true,
+        "browser": true,
+        "wsh": true,
+        "predef": [
+          "jQuery",
+          "define",
+          "module",
+        ],
       },
+    },
+
+    qunit: {
+      all: ['test/**/*.html'],
     },
 
     watch: {
@@ -94,4 +111,5 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks("grunt-rsync");
 
   grunt.registerTask("default", ["less", "rsync:styles", "rsync:scripts"]);
+  grunt.registerTask("test", ["qunit"]);
 }
