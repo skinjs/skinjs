@@ -11,12 +11,12 @@
 
   // key constants, used in data objects as keys
   // these shouldn't conflict with actual data keys
-  var INDEX     = '_index_'
-    , PARENT    = '_parent_'
-    , BASE      = '_base_'
-    , ADD       = '_add_'
-    , REMOVE    = '_remove_'
-    , OBSERVERS = '_observers_';
+  var INDEX     = '_index'
+    , PARENT    = '_parent'
+    , BASE      = '_base'
+    , ADD       = '_add'
+    , REMOVE    = '_remove'
+    , OBSERVERS = '_observers';
 
   // shortcuts
   var Objects   = Object.prototype
@@ -42,7 +42,7 @@
         // instance options
       , options = Skin.defaults
         // cached recipes for cooking components
-      , recipes = {}
+      , cache = {}
         // loader method, should be assigned after parsing the options
       , load = null;
 
@@ -107,24 +107,23 @@
     // helpers for internal use
     // ------------------------
     // find and return a data object by its index path
-    // e.g. var template = getData('hint-hidden-template');
-    //      var template = getData('hint.hidden.template');
-    //      var template = getData(['hint', 'hidden', 'template']);
-    var getData = function(index) {
+    // e.g. var template = get('hint-hidden-template');
+    //      var template = get('hint.hidden.template');
+    //      var template = get(['hint', 'hidden', 'template']);
+    var get = function(key) {
       var pointer = data
-        , keys = (isArray(index))? index : index.split(/[.-]/)
-        , key = null;
+        , keys = (isArray(key))? key : key.split(/[.-]/);
       while (keys.length) {
         key = keys.shift();
-        if (key in pointer) pointer = pointer[key];
+        if (has.call(pointer, key)) pointer = pointer[key];
         else return;
       }
       return pointer;
     }
     // set data object
-    // e.g. setData('hint-hidden-template', newTemplate);
-    //      setData('hint.hidden.template', newTemplate);
-    //      setData(['hint', 'hidden', 'template'], newTemplate);
+    // e.g. set('hint-hidden-template', newTemplate);
+    //      set('hint.hidden.template', newTemplate);
+    //      set(['hint', 'hidden', 'template'], newTemplate);
     var set = function(key, value) {
       var pointer = data
         , keys = (isArray(key))? key : key.split(/[.-]/)
@@ -132,28 +131,25 @@
       while (keys.length) {
         key = keys.shift();
         index.push(key);
-        // create mode
-        if (!has.call(pointer, key)) {
-          if (keys.length) {
+        if (keys.length) {
+          // there are still deeper levels
+          // existing or non existing keys should point to next level object
+          if (!has.call(pointer, key) || isArray(pointer[key])) {
+            // we should check if existing key points to an array
+            // if so, pretend it doesn't exist and create a new object
+            // otherwise the next level object can be pushed in the existing array
             pointer[key] = {};
             pointer[key][INDEX] = index.slice(0);
-          } else {
-            pointer[key] = value;
+            pointer[key][PARENT] = pointer;
           }
+          pointer = pointer[key];
+        } else {
+          // no more levels, last key
+          pointer[key] = value;
         }
-        pointer = pointer[key];
       }
+      // return the modified object
       return pointer;
-    }
-    // create index string for a data object and store it for future use
-    // dashes should be used only in HTML markups as classes or data attributes
-    // for internal use, index paths are divided by dots
-    var getIndex = function(pointer) {
-      if (typeof(pointer) === 'object' && pointer.hasOwnProperty(INDEX)) { return pointer[INDEX]; }
-      else {
-        var path = '';
-        // TODO: this
-      }
     }
     // chain of responsibility, ask delegates to perform something if they can
     var can = function(object, action) { return has.call(object, action) && isFunction(object[action]) }
@@ -169,9 +165,6 @@
 
     // execute initialize
     initialize();
-
-    set('a.b.c.d', [1,2,3,4]);
-    console.log(data);
 
 
     // public interface
