@@ -26,9 +26,13 @@
     , has       = Objects.hasOwnProperty;
 
   // helpers
-  var isObject = function(object) { return typeof(object) === 'object' }
-  var isFunction = function(object) { return typeof(object) === 'function' }
-  var isArray = function(object) { return object instanceof Array }
+  function isObject(object)   { return typeof(object) === 'object' }
+  function isFunction(object) { return typeof(object) === 'function' }
+  function isString(object)   { return typeof(object) === 'string' }
+  function isArray(object)    { return object instanceof Array }
+  function isWindow(object)   { return object != null && object == object.window }
+  function isDocument(object) { return object != null && object.nodeType == object.DOCUMENT_NODE }
+  function isData(object)     { return isObject(object) && !isArray(object) }
 
 
   // Skin class definition
@@ -37,52 +41,50 @@
     // private
     // -------
     var that = this
-        // root data object
-      , data = {}
-        // instance options
-      , options = Skin.defaults
-        // cached recipes for cooking components
+        // cached data object
       , cache = {}
         // loader method, should be assigned after parsing the options
       , load = null;
 
     // initialize
-    var initialize = function() {
-      // initialize data object
-      data[INDEX] = '';
-      data[PARENT] = null;
+    function initialize() {
+      // instance options
+      data('options', { base: Skin.defaults });
+      // cached recipes for cooking components
+      data('recipes', {});
       // parse options
-      parse(options, key, value);
+      //parse(options, key, value);
       // assign loader function for internal use
       // TODO: this should be done in update(key, value) after parsing options automatically
-      load = options.load;
+      //load = options.load;
       // create the skin plugin
-      if (options.plug && isObject(options.plug)) {
-        options.plug[options.alias] = function(type, options) {
+      //if (options.plug && isObject(options.plug)) {
+      //  options.plug[options.alias] = function(type, options) {
           // the plugin context
           // most probably this refers to an array of elements
           // wrapped in a jQuery or Zepto function
-        };
-      }
+      //  };
+      //}
     };
 
-    // parse and update options recursively
-    // the method captures ('option-a option-b'), ('key', value) and ({key: value}) formats
-    // target is the root or a sub branch in options
-    // key can be the source object, or the key in key, value pair
-    // value only matters when it is present and the key is a string
-    var parse = function(target, key, value) {
-      if (typeof(key) === 'object') {
+    // parse and update data recursively
+    // the method captures ('option-a option-b data-c'), ('key', value) and
+    // nested ({key: value, otherKey: { someOtherKey: someOtherValue }}) formats
+    // target is the target data object, such as cache, recipes, options
+    // key can be the source object, or the key of ('key', value) pair
+    // value only matters when it is present and key is a string
+    function parse(target, key, value) {
+      if (isObject(key)) {
         // we have an object, try to match target with it, discard value
         var source = key;
         for (key in source) {
-          if (typeof(source[key]) === 'object') {
+          if (isObject(source[key])) {
             // if the value is an Array, just assign it in target
-            if (source[key] instanceof Array) target[key] = source[key];
+            if (isArray(source[key])) target[key] = source[key];
             else {
               // we have an object
               var base, method;
-              base = source[key]['base'] || source[key];
+              base = source[key][BASE] || source[key];
                 // means the branch is based on other branch
                 // this should be passed and set in target
                 // first, check for update methods
@@ -106,58 +108,67 @@
 
     // helpers for internal use
     // ------------------------
-    // find and return a data object by its index path
-    // e.g. var template = get('hint-hidden-template');
-    //      var template = get('hint.hidden.template');
-    //      var template = get(['hint', 'hidden', 'template']);
-    var get = function(key) {
-      var pointer = data
-        , keys = (isArray(key))? key : key.split(/[.-]/);
-      while (keys.length) {
-        key = keys.shift();
-        if (has.call(pointer, key)) pointer = pointer[key];
-        else return;
-      }
-      return pointer;
-    }
-    // set data object
-    // e.g. set('hint-hidden-template', newTemplate);
-    //      set('hint.hidden.template', newTemplate);
-    //      set(['hint', 'hidden', 'template'], newTemplate);
-    var set = function(key, value) {
-      var pointer = data
+    // get or set a data object by its index path
+    // index path can be an array, or string sliced by . or -
+    function data(key, value) {
+      var pointer = cache
         , keys = (isArray(key))? key : key.split(/[.-]/)
         , index = [];
       while (keys.length) {
         key = keys.shift();
-        index.push(key);
-        if (keys.length) {
-          // there are still deeper levels
-          // existing or non existing keys should point to next level object
-          if (!has.call(pointer, key) || isArray(pointer[key])) {
-            // we should check if existing key points to an array
-            // if so, pretend it doesn't exist and create a new object
-            // otherwise the next level object can be pushed in the existing array
-            pointer[key] = {};
-            pointer[key][INDEX] = index.slice(0);
-            pointer[key][PARENT] = pointer;
+        if (arguments.length == 2) {
+          // set value, create, update or delete (set null)
+          index.push(key);
+          if (keys.length) {
+            // there are still deeper levels
+            // existing or non existing keys should point to next level object
+            if (!has.call(pointer, key) || !isData(pointer[key])) {
+              // we should check if existing key points to an array
+              // if so, pretend it doesn't exist and create a new object
+              // otherwise the next level object can be pushed in the existing array
+              pointer[key] = { index: index.slice(0), parent: pointer };
+            }
+            pointer = pointer[key];
+          } else {
+            // no more levels, last key
+            pointer[key] = value;
+            if (isData(value)) {
+              // if last value is a data object, set index and parent for it
+              value.index = index.slice(0);
+              value.parent = pointer;
+            }
+            pointer = pointer[key];
           }
-          pointer = pointer[key];
         } else {
-          // no more levels, last key
-          pointer[key] = value;
+          // get value, read
+          if (has.call(pointer, key)) pointer = pointer[key];
+          else {
+            // check for value in base(s), go back deep!
+            while (isData(pointer.base)) {
+              pointer = pointer.base;
+              if (has.call(pointer, key)) {
+                pointer = pointer[key];
+                break;
+              }
+            }
+          }
         }
       }
-      // return the modified object
       return pointer;
     }
+    function bind(key, type, action) {
+      
+    }
+    function unbind(key, type, action) {
+      
+    }
     // chain of responsibility, ask delegates to perform something if they can
-    var can = function(object, action) { return has.call(object, action) && isFunction(object[action]) }
-    var ask = function(action) {
+    function can(object, action) { return has.call(object, action) && isFunction(object[action]) }
+    function ask(action) {
       if (can(this, action)) return this[action].apply(this, slice.call(arguments, 1));
       else for(var count in options.delegates) {
         var delegate = options.delegates[count];
-        if (can(delegate, action)) return delegate[action].apply(this, slice.call(arguments, 1));
+        if (delegate && can(delegate, action)) return delegate[action].apply(this, slice.call(arguments, 1));
       }
       return false;
     }
@@ -165,7 +176,6 @@
 
     // execute initialize
     initialize();
-
 
     // public interface
     // ----------------
@@ -234,6 +244,7 @@
     root.Skin = oldSkin;
     return this;
   };
+
 
   // View class definition
   // ---------------------
