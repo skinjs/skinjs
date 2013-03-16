@@ -11,12 +11,15 @@
 
   // key constants, used in data objects as keys
   // these shouldn't conflict with actual data keys
-  var INDEX     = '_index'
-    , PARENT    = '_parent'
-    , BASE      = '_base'
-    , ADD       = '_add'
-    , REMOVE    = '_remove'
-    , OBSERVERS = '_observers';
+  var INDEX     = 'index'
+    , PARENT    = 'parent'
+    , BASE      = 'base'
+    , OBSERVERS = 'observers'
+    , OPTIONS   = 'options'
+    , RECIPES   = 'recipes'
+    , ALIAS     = 'alias'
+    , PLUG      = 'plug'
+    , LOAD      = 'load';
 
   // shortcuts
   var Objects   = Object.prototype
@@ -26,13 +29,11 @@
     , has       = Objects.hasOwnProperty;
 
   // helpers
-  function isObject(object)   { return typeof(object) === 'object' }
+  function isArray(object)    { return object instanceof Array }
+  function isObject(object)   { return object != null && typeof(object) === 'object' }
   function isFunction(object) { return typeof(object) === 'function' }
   function isString(object)   { return typeof(object) === 'string' }
-  function isArray(object)    { return object instanceof Array }
-  function isWindow(object)   { return object != null && object == object.window }
-  function isDocument(object) { return object != null && object.nodeType == object.DOCUMENT_NODE }
-  function isData(object)     { return isObject(object) && !isArray(object) }
+  function isCachable(object) { return isObject(object) && !isArray(object) }
 
 
   // Skin class definition
@@ -49,58 +50,47 @@
     // initialize
     function initialize() {
       // instance options
-      data('options', { base: Skin.defaults });
-      // cached recipes for cooking components
-      data('recipes', {});
-      // parse options
-      //parse(options, key, value);
+      data(OPTIONS, { base: Skin.defaults });
+      // cached recipes for cooking components!
+      data(RECIPES, {});
+      // parse options, we pass array to speed up
+      parse([OPTIONS], key, value);
       // assign loader function for internal use
-      // TODO: this should be done in update(key, value) after parsing options automatically
-      //load = options.load;
+      load = data([OPTIONS, LOAD]);
       // create the skin plugin
-      //if (options.plug && isObject(options.plug)) {
-      //  options.plug[options.alias] = function(type, options) {
+      if (isObject(data([OPTIONS, PLUG]))) {
+        data([OPTIONS, PLUG])[data([OPTIONS, ALIAS])] = function(type, options) {
           // the plugin context
           // most probably this refers to an array of elements
           // wrapped in a jQuery or Zepto function
-      //  };
-      //}
-    };
+        };
+      }
+    }
+
 
     // parse and update data recursively
     // the method captures ('option-a option-b data-c'), ('key', value) and
     // nested ({key: value, otherKey: { someOtherKey: someOtherValue }}) formats
-    // target is the target data object, such as cache, recipes, options
-    // key can be the source object, or the key of ('key', value) pair
-    // value only matters when it is present and key is a string
-    function parse(target, key, value) {
-      if (isObject(key)) {
-        // we have an object, try to match target with it, discard value
-        var source = key;
-        for (key in source) {
-          if (isObject(source[key])) {
-            // if the value is an Array, just assign it in target
-            if (isArray(source[key])) target[key] = source[key];
-            else {
-              // we have an object
-              var base, method;
-              base = source[key][BASE] || source[key];
-                // means the branch is based on other branch
-                // this should be passed and set in target
-                // first, check for update methods
-              if (source[key]['method']) {}
-              if (!target.hasOwnProperty(key)) target[key] = {}
-              parse(target[key], source[key]);
-            }
-          }
+    // parsing will result in one or several calls to data(), so the observers would be
+    // notified if a specific value changes
+    function parse(index, key, value) {
+      // index path of starting level
+      var index = index || [];
+      if (isCachable(key)) {
+        // we have a data object as key, discard value
+        var pointer = key;
+        for (key in pointer) {
+          index.push(key);
+          if (isCachable(pointer[key])) parse (index, pointer[key]);
+          else data(index, pointer[key]);
         }
-      } else if (typeof(key) === 'string') {
+      } else if (isString(key)) {
         if (!value) {
           // parse options string
-          // TODO: implement this
+          // TODO: all the magic goes here!
         } else {
-          target[key] = value;
-          // TODO: call observers methods
+          // simple ('key', value) pair
+          data(key, value);
         }
       }
     }
@@ -109,7 +99,7 @@
     // helpers for internal use
     // ------------------------
     // get or set a data object by its index path
-    // index path can be an array, or string sliced by . or -
+    // index path (key) can be an array, or string sliced by . or -
     function data(key, value) {
       var pointer = cache
         , keys = (isArray(key))? key : key.split(/[.-]/)
@@ -122,20 +112,22 @@
           if (keys.length) {
             // there are still deeper levels
             // existing or non existing keys should point to next level object
-            if (!has.call(pointer, key) || !isData(pointer[key])) {
+            if (!has.call(pointer, key) || !isCachable(pointer[key])) {
               // we should check if existing key points to an array
               // if so, pretend it doesn't exist and create a new object
               // otherwise the next level object can be pushed in the existing array
-              pointer[key] = { index: index.slice(0), parent: pointer };
+              pointer[key] = {};
+              pointer[key][INDEX] = index.slice(0);
+              pointer[key][PARENT] = pointer;
             }
             pointer = pointer[key];
           } else {
             // no more levels, last key
             pointer[key] = value;
-            if (isData(value)) {
-              // if last value is a data object, set index and parent for it
-              value.index = index.slice(0);
-              value.parent = pointer;
+            if (isCachable(value)) {
+              // if last value is a data object itself, set index and parent for it
+              value[INDEX] = index.slice(0);
+              value[PARENT] = pointer;
             }
             pointer = pointer[key];
           }
@@ -144,8 +136,8 @@
           if (has.call(pointer, key)) pointer = pointer[key];
           else {
             // check for value in base(s), go back deep!
-            while (isData(pointer.base)) {
-              pointer = pointer.base;
+            while (isCachable(pointer[BASE])) {
+              pointer = pointer[BASE];
               if (has.call(pointer, key)) {
                 pointer = pointer[key];
                 break;
@@ -176,6 +168,7 @@
 
     // execute initialize
     initialize();
+
 
     // public interface
     // ----------------
