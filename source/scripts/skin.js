@@ -1,34 +1,21 @@
-/*
+// $('#foo').skin('hint', { template: '<div></div>', data: whatever.data })
+// $('#foo').hint({ template: { base: 'basic' }, data: { map: { foo: 'bar' }}})
+// $('#foo').skin('hint', { states: {  }})
+// $('#foo').hint().hide();
+// $('#foo').hint().addState('flash', { template: { base: 'flashy'}});
 
-$('#owner').skin({ base: 'hint', alias: 'tooltip', template: '<div><% content %></div>', states })
-
-*/
 (function() {
   "use strict";
 
 
   // Module properties
   // -----------------
-  // caching references
-  // existing Skin is kept as oldSkin
-  var root    = this
-    , oldSkin = root.Skin;
-
-  // key constants, used in data objects as keys
-  // these shouldn't conflict with actual data keys
-  var INDEX     = 'index'
-    , PARENT    = 'parent'
-    , BASE      = 'base'
-    , OBSERVERS = 'observers'
-    // frequently used strings
-    , OPTIONS   = 'options'
-    , RECIPES   = 'recipes'
-    , ALIAS     = 'alias'
-    , PLUG      = 'plug'
-    , LOAD      = 'load';
-
-  // shortcuts
-  var Objects   = Object.prototype
+  // shortcuts and references
+  var root      = this
+      // existing Skin is kept as oldSkin, to assign back in noConflict()
+    , oldSkin   = root.Skin
+      // shortcuts
+    , Objects   = Object.prototype
     , Functions = Function.prototype
     , Arrays    = Array.prototype
     , slice     = Arrays.slice
@@ -43,35 +30,36 @@ $('#owner').skin({ base: 'hint', alias: 'tooltip', template: '<div><% content %>
 
   // Skin class definition
   // ---------------------
-  var Skin = root.Skin = function(key, value) {
+  var Skin = root.Skin = function(alias, options) {
     // private
     // -------
     var that = this
-        // cached data object
-      , cache = {}
+        // main data
+      , data = {}
         // loader method, should be assigned after parsing the options
-      , load = null;
+      , require = null
 
     // initialize
     function initialize() {
       // instance options
-      that.data(OPTIONS, { base: Skin.defaults });
+      options({ base: Skin.defaults });
+      console.log(options());
       // cached recipes for cooking components!
-      that.data(RECIPES, {});
+      access(data, 'recipes', {});
       // parse options, we pass array to speed up
       parse([OPTIONS], key, value);
       // assign loader function for internal use
-      load = that.data([OPTIONS, LOAD]);
+      load = data([OPTIONS, LOAD]);
       // preload required modules
-      load(that.data([OPTIONS, 'pack']), that.data([OPTIONS, 'preload']), function() {
+      load(data([OPTIONS, 'pack']), data([OPTIONS, 'preload']), function() {
         for(var count in arguments) {
           var decorator = arguments[count];
           decorator.call(that);
         };
       });
       // create the skin plugin
-      if (isObject(that.data([OPTIONS, PLUG]))) {
-        that.data([OPTIONS, PLUG])[that.data([OPTIONS, ALIAS])] = function(type, options) {
+      if (isObject(data([OPTIONS, PLUG]))) {
+        data([OPTIONS, PLUG])[data([OPTIONS, ALIAS])] = function(type, options) {
           // the plugin context
           // most probably this refers to an array of elements
           // wrapped in a jQuery or Zepto function
@@ -80,75 +68,69 @@ $('#owner').skin({ base: 'hint', alias: 'tooltip', template: '<div><% content %>
     }
 
 
-    // parse and update cache recursively
-    // the method captures ('option-a option-b data-c'), ('key', value) and
-    // nested ({ key: value, otherKey: { someOtherKey: someOtherValue }}) formats
-    // parsing will result in one or several calls to data(), so the observers would be
-    // notified if a specific value changed
-    function parse(index, key, value) {
-      // index path of starting level
-      var index = index || [];
-      if (isObject(key)) {
-        // we have a data object as key, discard value
-        var pointer = key;
-        for (key in pointer) {
-          index.push(key);
-          if (isObject(pointer[key])) parse(index, pointer[key]);
-          else that.data(index, pointer[key]);
+    // load modules, handle the return value
+    // if its a function, run it on this instance
+    // if its data, parse and merge it to instance data
+    function load(modules) {
+      load(options(['pack']), modules, function() {
+        for(var count in arguments) {
+          var decorator = arguments[count];
+          if (isFunction(decorator)) decorator.call(that);
+          else if (isObject(decorator)) parse(decorator);
         }
-      } else if (isString(key)) {
-        if (!value) {
-          // parse options string
-          // TODO: all the magic goes here!
-        } else {
-          // simple ('key', value) pair
-          that.data(key, value);
-        }
-      }
+      });
     }
 
 
-    // helpers for internal use
-    // ------------------------
-    // get or set a cached object by its index path
-    // index path (key) can be an array, or string sliced by . or -
-    that.data = function(key, value) {
-      var pointer = cache
-        , keys = (isArray(key))? key : key.split(/[.-]/)
-        , index = [];
+    // parse and update data recursively
+    // in each recurse we should try to break down complex inputs
+    // so we'd be able to call a simple access() on each value seperately
+    // the method captures ('option-a option-b data-c'), (pointer, 'key', value),
+    // (pointer, [index], { key: value }), (pointer, value), ('key', value), and
+    // nested ({ key: value, otherKey: { someOtherKey: someOtherValue }}) formats
+    function parse() {
+    }
+
+
+    // get or set value of an index path, related to the pointer
+    // index path can be an array, or string chunks sliced by . or -
+    // we should use arrays when its possible, to speed up
+    // value should be a primitive string, array, boolean, number etc.
+    // however objects can be passed as value too, but this will
+    // result in mass assigning values, change observers won't be notified this way
+    // objects should be parsed instead
+    function access(pointer, index, value) {
+      // if there's no pointer, start from root data
+      var pointer = pointer || data
+        , keys = (isArray(index))? index : index.split(/[.-]/);
       while (keys.length) {
         key = keys.shift();
-        if (arguments.length == 2) {
-          // set value, create, update or delete
-          index.push(key);
+        // TODO: do we need special keys like 'self', 'parent' etc.?
+        if (arguments.length == 3) {
+          // set value
           if (keys.length) {
             // there are still deeper levels
-            // existing or non existing keys should point to next level cache
+            // existing or non existing keys should point to next level object
             if (!has.call(pointer, key) || !isObject(pointer[key])) {
               // isObject() returns false for arrays
-              // otherwise the next level cache could be pushed in the existing array
+              // otherwise the next level object could be pushed in the existing array
               pointer[key] = {};
-              pointer[key][INDEX] = index.slice(0);
-              pointer[key][PARENT] = pointer;
             }
             pointer = pointer[key];
           } else {
             // no more levels, last key
-            pointer[key] = value;
-            if (isObject(value)) {
-              // if last value is a cache object itself, set index and parent for it
-              value[INDEX] = index.slice(0);
-              value[PARENT] = pointer;
-            }
-            pointer = pointer[key];
+            // if value is null, we remove the key by convension
+            // no one wants a key pointing to null!
+            if (value == null) delete pointer[key];
+            else pointer = pointer[key] = value;
           }
         } else {
-          // get value, read
+          // get value
           if (has.call(pointer, key)) pointer = pointer[key];
           else {
-            // check for value in bases
-            while (isObject(pointer[BASE])) {
-              pointer = pointer[BASE];
+            // check for value in base
+            while (isObject(pointer.base)) {
+              pointer = pointer.base;
               if (has.call(pointer, key)) {
                 pointer = pointer[key];
                 break;
@@ -159,6 +141,12 @@ $('#owner').skin({ base: 'hint', alias: 'tooltip', template: '<div><% content %>
       }
       return pointer;
     }
+
+    // data access shortcuts
+    function options(index, value)   { return access.call(that, data.options, index, value) }
+    function templates(index, value) { return access.call(that, data.templates, index, value) }
+    function actions(index, value)   { return access.call(that, data.actions, index, value) }
+    function recipes(index, value)   { return access.call(that, data.recipes, index, value) }
 
 
     function bind(key, type, action) {
@@ -227,8 +215,9 @@ $('#owner').skin({ base: 'hint', alias: 'tooltip', template: '<div><% content %>
     // default method to load modules
     // based on define(), proposed by CommonJS
     // for Asynchronous Module Definition (AMD)
-  , load: root.require || root.curl
-  , preload: ['base', 'sense']
+  , require: root.require || root.curl
+    // preload frequently used modules to speed up things
+  , preload: ['base']
     // default paths for modules
   , pack: {
       baseUrl: './'
