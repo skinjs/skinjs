@@ -1,3 +1,8 @@
+/*
+
+$('#owner').skin({ base: 'hint', alias: 'tooltip', template: '<div><% content %></div>', states })
+
+*/
 (function() {
   "use strict";
 
@@ -15,6 +20,7 @@
     , PARENT    = 'parent'
     , BASE      = 'base'
     , OBSERVERS = 'observers'
+    // frequently used strings
     , OPTIONS   = 'options'
     , RECIPES   = 'recipes'
     , ALIAS     = 'alias'
@@ -28,12 +34,11 @@
     , slice     = Arrays.slice
     , has       = Objects.hasOwnProperty;
 
-  // helpers
+  // helpers for internal use
   function isArray(object)    { return object instanceof Array }
-  function isObject(object)   { return object != null && typeof(object) === 'object' }
-  function isFunction(object) { return typeof(object) === 'function' }
   function isString(object)   { return typeof(object) === 'string' }
-  function isCachable(object) { return isObject(object) && !isArray(object) }
+  function isFunction(object) { return typeof(object) === 'function' }
+  function isObject(object)   { return object != null && typeof(object) === 'object' && !isArray(object) }
 
 
   // Skin class definition
@@ -50,16 +55,23 @@
     // initialize
     function initialize() {
       // instance options
-      data(OPTIONS, { base: Skin.defaults });
+      that.data(OPTIONS, { base: Skin.defaults });
       // cached recipes for cooking components!
-      data(RECIPES, {});
+      that.data(RECIPES, {});
       // parse options, we pass array to speed up
       parse([OPTIONS], key, value);
       // assign loader function for internal use
-      load = data([OPTIONS, LOAD]);
+      load = that.data([OPTIONS, LOAD]);
+      // preload required modules
+      load(that.data([OPTIONS, 'pack']), that.data([OPTIONS, 'preload']), function() {
+        for(var count in arguments) {
+          var decorator = arguments[count];
+          decorator.call(that);
+        };
+      });
       // create the skin plugin
-      if (isObject(data([OPTIONS, PLUG]))) {
-        data([OPTIONS, PLUG])[data([OPTIONS, ALIAS])] = function(type, options) {
+      if (isObject(that.data([OPTIONS, PLUG]))) {
+        that.data([OPTIONS, PLUG])[that.data([OPTIONS, ALIAS])] = function(type, options) {
           // the plugin context
           // most probably this refers to an array of elements
           // wrapped in a jQuery or Zepto function
@@ -68,21 +80,21 @@
     }
 
 
-    // parse and update data recursively
+    // parse and update cache recursively
     // the method captures ('option-a option-b data-c'), ('key', value) and
-    // nested ({key: value, otherKey: { someOtherKey: someOtherValue }}) formats
+    // nested ({ key: value, otherKey: { someOtherKey: someOtherValue }}) formats
     // parsing will result in one or several calls to data(), so the observers would be
-    // notified if a specific value changes
+    // notified if a specific value changed
     function parse(index, key, value) {
       // index path of starting level
       var index = index || [];
-      if (isCachable(key)) {
+      if (isObject(key)) {
         // we have a data object as key, discard value
         var pointer = key;
         for (key in pointer) {
           index.push(key);
-          if (isCachable(pointer[key])) parse (index, pointer[key]);
-          else data(index, pointer[key]);
+          if (isObject(pointer[key])) parse(index, pointer[key]);
+          else that.data(index, pointer[key]);
         }
       } else if (isString(key)) {
         if (!value) {
@@ -90,7 +102,7 @@
           // TODO: all the magic goes here!
         } else {
           // simple ('key', value) pair
-          data(key, value);
+          that.data(key, value);
         }
       }
     }
@@ -98,24 +110,23 @@
 
     // helpers for internal use
     // ------------------------
-    // get or set a data object by its index path
+    // get or set a cached object by its index path
     // index path (key) can be an array, or string sliced by . or -
-    function data(key, value) {
+    that.data = function(key, value) {
       var pointer = cache
         , keys = (isArray(key))? key : key.split(/[.-]/)
         , index = [];
       while (keys.length) {
         key = keys.shift();
         if (arguments.length == 2) {
-          // set value, create, update or delete (set null)
+          // set value, create, update or delete
           index.push(key);
           if (keys.length) {
             // there are still deeper levels
-            // existing or non existing keys should point to next level object
-            if (!has.call(pointer, key) || !isCachable(pointer[key])) {
-              // we should check if existing key points to an array
-              // if so, pretend it doesn't exist and create a new object
-              // otherwise the next level object can be pushed in the existing array
+            // existing or non existing keys should point to next level cache
+            if (!has.call(pointer, key) || !isObject(pointer[key])) {
+              // isObject() returns false for arrays
+              // otherwise the next level cache could be pushed in the existing array
               pointer[key] = {};
               pointer[key][INDEX] = index.slice(0);
               pointer[key][PARENT] = pointer;
@@ -124,8 +135,8 @@
           } else {
             // no more levels, last key
             pointer[key] = value;
-            if (isCachable(value)) {
-              // if last value is a data object itself, set index and parent for it
+            if (isObject(value)) {
+              // if last value is a cache object itself, set index and parent for it
               value[INDEX] = index.slice(0);
               value[PARENT] = pointer;
             }
@@ -135,8 +146,8 @@
           // get value, read
           if (has.call(pointer, key)) pointer = pointer[key];
           else {
-            // check for value in base(s), go back deep!
-            while (isCachable(pointer[BASE])) {
+            // check for value in bases
+            while (isObject(pointer[BASE])) {
               pointer = pointer[BASE];
               if (has.call(pointer, key)) {
                 pointer = pointer[key];
@@ -148,6 +159,8 @@
       }
       return pointer;
     }
+
+
     function bind(key, type, action) {
       
     }
@@ -157,6 +170,7 @@
     // chain of responsibility, ask delegates to perform something if they can
     function can(object, action) { return has.call(object, action) && isFunction(object[action]) }
     function ask(action) {
+      // apply() lets us pass an array of arguments, unlike call() which requires each argument
       if (can(this, action)) return this[action].apply(this, slice.call(arguments, 1));
       else for(var count in options.delegates) {
         var delegate = options.delegates[count];
@@ -214,6 +228,7 @@
     // based on define(), proposed by CommonJS
     // for Asynchronous Module Definition (AMD)
   , load: root.require || root.curl
+  , preload: ['base', 'sense']
     // default paths for modules
   , pack: {
       baseUrl: './'
