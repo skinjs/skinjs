@@ -22,49 +22,33 @@
     , has       = Objects.hasOwnProperty;
 
   // helpers for internal use
-  function isArray(object)    { return object instanceof Array }
-  function isString(object)   { return typeof(object) === 'string' }
-  function isFunction(object) { return typeof(object) === 'function' }
-  function isObject(object)   { return object != null && typeof(object) === 'object' && !isArray(object) }
+  function isArray(symbol)    { return symbol instanceof Array }
+  function isString(symbol)   { return typeof(symbol) === 'string' }
+  function isFunction(symbol) { return typeof(symbol) === 'function' }
+  function isObject(symbol)   { return symbol != null && typeof(symbol) === 'object' && !isArray(symbol) }
 
 
   // Skin class definition
   // ---------------------
-  var Skin = root.Skin = function(alias, options) {
+  var Skin = root.Skin = function(element, alias, settings) {
     // private
     // -------
     var that = this
         // main data
       , data = {}
-        // loader method, should be assigned after parsing the options
+        // loader method, should be assigned after parsing the settings
       , require = null
 
     // initialize
     function initialize() {
-      // instance options
-      options({ base: Skin.defaults });
-      console.log(options());
-      // cached recipes for cooking components!
-      access(data, 'recipes', {});
+      settings({ base: Skin.defaults });
       // parse options, we pass array to speed up
-      parse([OPTIONS], key, value);
+      
       // assign loader function for internal use
-      load = data([OPTIONS, LOAD]);
+      
       // preload required modules
-      load(data([OPTIONS, 'pack']), data([OPTIONS, 'preload']), function() {
-        for(var count in arguments) {
-          var decorator = arguments[count];
-          decorator.call(that);
-        };
-      });
+      
       // create the skin plugin
-      if (isObject(data([OPTIONS, PLUG]))) {
-        data([OPTIONS, PLUG])[data([OPTIONS, ALIAS])] = function(type, options) {
-          // the plugin context
-          // most probably this refers to an array of elements
-          // wrapped in a jQuery or Zepto function
-        };
-      }
     }
 
 
@@ -81,14 +65,54 @@
       });
     }
 
+    // convert string index to array index
+    function sanitize(index) { return (isArray(index))? index : (isString(index))? index.split(/[.-]/) : [] }
 
     // parse and update data recursively
     // in each recurse we should try to break down complex inputs
-    // so we'd be able to call a simple access() on each value seperately
-    // the method captures ('option-a option-b data-c'), (pointer, 'key', value),
-    // (pointer, [index], { key: value }), (pointer, value), ('key', value), and
-    // nested ({ key: value, otherKey: { someOtherKey: someOtherValue }}) formats
+    // and finally call a simple access() on each value seperately
+    // e.g. parse('key-value-a key-value-b data-c');
+    //      parse('hint-state-expose-error hint-position-bottom');
+    //      parse('hint-hide-on-body-click hint-dont-hide-on-element-focus');
+    //      parse({ templates: { a: '<p>{{a}}</p>' }, actions: { jump: function(){}}});
+    //      parse({ key: { otherKey: value }});
+    //      parse(pointer, 'key.otehrKey-anotherKey', value);
+    //      parse(pointer, ['key', 'otherKey'], value);
+    //      parse(['key', 'otherKey'], { anotherKey: value});
+    //      parse(pointer, value);
+    //      parse(pointer, { key: value });
+    //      parse('key', value);
     function parse() {
+      var pointer, index, key, value;
+      switch (arguments.length) {
+        case 3:
+          // we have pointer, index and value
+          pointer = arguments[0];
+          index   = sanitize(arguments[1]);
+          value   = arguments[2];
+          break;
+        case 2:
+          // we have either pointer or index, and value
+          if (isObject(arguments[0])) {
+            pointer = arguments[0];
+            index   = [];
+          } else {
+            pointer = null;
+            index   = sanitize(arguments[0]);
+          }
+          value = arguments[1];
+          break;
+        case 1:
+          // the only argument, could be an object or string
+          if (isObject(arguments[0])) {
+            pointer = null;
+            index   = [];
+            value   = arguments[0];
+          } else {
+            // TODO: parse string
+          }
+      }
+      access(pointer, index, value);
     }
 
 
@@ -102,13 +126,16 @@
     function access(pointer, index, value) {
       // if there's no pointer, start from root data
       var pointer = pointer || data
-        , keys = (isArray(index))? index : index.split(/[.-]/);
-      while (keys.length) {
-        key = keys.shift();
-        // TODO: do we need special keys like 'self', 'parent' etc.?
+        , index = sanitize(index)
+        , key;
+      // first handle an empty index with an object as value
+      // note that the value can't be assigned to the pointer directly
+      if (!index.length && isObject(value)) for (key in value) access(pointer, [key], value[key]);
+      else while (index.length) {
+        key = index.shift();
         if (arguments.length == 3) {
           // set value
-          if (keys.length) {
+          if (index.length) {
             // there are still deeper levels
             // existing or non existing keys should point to next level object
             if (!has.call(pointer, key) || !isObject(pointer[key])) {
@@ -143,10 +170,10 @@
     }
 
     // data access shortcuts
-    function options(index, value)   { return access.call(that, data.options, index, value) }
-    function templates(index, value) { return access.call(that, data.templates, index, value) }
-    function actions(index, value)   { return access.call(that, data.actions, index, value) }
-    function recipes(index, value)   { return access.call(that, data.recipes, index, value) }
+    function settings()  { return parse.apply(that, Array(data.settings  || (data.settings  = {})).concat(slice.call(arguments, 0))) }
+    function actions()   { return parse.apply(that, Array(data.actions   || (data.actions   = {})).concat(slice.call(arguments, 0))) }
+    function recipes()   { return parse.apply(that, Array(data.recipes   || (data.recipes   = {})).concat(slice.call(arguments, 0))) }
+    function templates() { return parse.apply(that, Array(data.templates || (data.templates = {})).concat(slice.call(arguments, 0))) }
 
 
     function bind(key, type, action) {
