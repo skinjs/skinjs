@@ -99,11 +99,10 @@
         case 2:
           // we have either pointer or index, and value for setting value
           // or pointer and index, for getting a value
-          // TODO: clean this shit
           if (isObject(arguments[0])) {
-            if (isString(arguments[1])) {
-              if (value = access(arguments[0], arguments[1])) return value;
-            }
+            // we should check if second argument is string, then pass it to access for getting a value
+            // otherwise access will handle it as a set value, without index
+            if (isString(arguments[1]) && (value = access(arguments[0], arguments[1]))) return value;
             pointer = arguments[0];
             index   = [];
           } else {

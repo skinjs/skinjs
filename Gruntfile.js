@@ -39,6 +39,7 @@ module.exports = function(grunt) {
 
     uglify: {
       options: {
+        beautify: true,
         banner: '/*! <%= pkg.name %> - v<%= pkg.version %> - ' + '<%= grunt.template.today("yyyy-mm-dd") %> */',
       },
       files: {
@@ -52,7 +53,7 @@ module.exports = function(grunt) {
 
     rsync: {
       scripts: {
-        src: "source/scripts/",
+        src: "destination/scripts/",
         dest: "<%= options.rsync.scripts.dest %>",
         recursive: true,
         syncDest: true,
@@ -96,7 +97,7 @@ module.exports = function(grunt) {
 
     watch: {
       files: "source/**/*",
-      tasks: ["less", "rsync:styles", "rsync:scripts"],
+      tasks: ["less", "uglify", "rsync:styles", "rsync:scripts"],
     },
 
   });
@@ -110,6 +111,6 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks("grunt-contrib-watch");
   grunt.loadNpmTasks("grunt-rsync");
 
-  grunt.registerTask("default", ["less", "rsync:styles", "rsync:scripts"]);
+  grunt.registerTask("default", ["less", "uglify", "rsync:styles", "rsync:scripts"]);
   grunt.registerTask("test", ["qunit"]);
 }
