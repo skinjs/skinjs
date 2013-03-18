@@ -16,7 +16,6 @@
     , oldSkin   = root.Skin
       // shortcuts
     , Objects   = Object.prototype
-    , Functions = Function.prototype
     , Arrays    = Array.prototype
     , slice     = Arrays.slice
     , has       = Objects.hasOwnProperty;
@@ -34,11 +33,11 @@
     // private
     // -------
     var that = this
-        // main data
+        // root data object
       , data = {}
         // loader method
       , require
-        // plugins scope
+        // plugin scope
       , plugin;
 
     // initialize
@@ -47,7 +46,7 @@
       settings({ base: Skin.defaults });
       // parse options
       settings(options);
-      // assign require function for internal use
+      // assign require function implementation
       require = settings('require');
       // preload required modules
       load(settings('preload'));
@@ -57,7 +56,7 @@
     }
 
     // load modules, handle the return value
-    // if its a function, run it on this instance
+    // if its a function, run it on this instance context
     // if its data, parse and merge it to instance data
     function load(modules) {
       if (!isArray(modules)) modules = slice.call(arguments, 0);
@@ -67,7 +66,7 @@
           if (isFunction(decorator)) decorator.call(that);
           else if (isObject(decorator)) parse(decorator);
         }
-      });
+      })
     }
 
     // convert string index to array index
@@ -88,38 +87,38 @@
     //      parse(pointer, { key: value });
     //      parse('key', value);
     function parse() {
-      var pointer, index, key, value;
-      switch (arguments.length) {
+      var pointer, index, key, value, args = arguments;
+      switch (args.length) {
         case 3:
           // we have pointer, index and value
-          pointer = arguments[0];
-          index   = sanitize(arguments[1]);
-          value   = arguments[2];
+          pointer = args[0];
+          index   = sanitize(args[1]);
+          value   = args[2];
           break;
         case 2:
-          // we have either pointer or index, and value for setting value
-          // or pointer and index, for getting a value
-          if (isObject(arguments[0])) {
+          // we have either pointer or index, along with value for set
+          // or pointer and index, to get a value
+          if (isObject(args[0])) {
             // we should check if second argument is string, then pass it to access for getting a value
             // otherwise access will handle it as a set value, without index
-            if (isString(arguments[1]) && (value = access(arguments[0], arguments[1]))) return value;
-            pointer = arguments[0];
+            if (isString(args[1]) && (value = access(args[0], args[1]))) return value;
+            pointer = args[0];
             index   = [];
           } else {
             pointer = null;
-            index   = sanitize(arguments[0]);
+            index   = sanitize(args[0]);
           }
-          value = arguments[1];
+          value = args[1];
           break;
         case 1:
           // the only argument, could be an object or string
-          if (isObject(arguments[0])) {
+          if (isObject(args[0])) {
             pointer = null;
             index   = [];
-            value   = arguments[0];
+            value   = args[0];
           } else {
             // strings can be used both for getting or setting data
-            if (value = access(null, arguments[0])) return value;
+            if (value = access(null, args[0])) return value;
             // TODO: parse strings for settings values
           }
       }
@@ -179,8 +178,8 @@
 
     // data access shortcuts
     function settings()  { return parse.apply(that, Array(data.settings  || (data.settings  = {})).concat(slice.call(arguments, 0))) }
-    function actions()   { return parse.apply(that, Array(data.actions   || (data.actions   = {})).concat(slice.call(arguments, 0))) }
     function recipes()   { return parse.apply(that, Array(data.recipes   || (data.recipes   = {})).concat(slice.call(arguments, 0))) }
+    function actions()   { return parse.apply(that, Array(data.actions   || (data.actions   = {})).concat(slice.call(arguments, 0))) }
     function templates() { return parse.apply(that, Array(data.templates || (data.templates = {})).concat(slice.call(arguments, 0))) }
 
     function bind(key, type, action) {
@@ -201,23 +200,29 @@
       return false;
     }
 
-
     // execute initialize
     initialize();
-
 
     // public interface
     // ----------------
     return {
+      // create skin component for elements
+      cover: function(elements, alias, recipe) {
+        var base;
+        // if a recipe exists for the alias, ensure we have a correct base
+        // otherwise create a new recipe and use it as base
+        if (base = recipes(alias)) {}
+        else base = recipes(alias, recipe);
+        console.log(data);
+      }
     }
   }
-
 
   // Skin static properties
   // ----------------------
   Skin.VERSION = '0.0.0';
   Skin.defaults = {
-    // plugin name, unique id prefix etc.
+    // name, used for plugin, unique id prefix etc.
     alias: 'skin'
     // include the scanner or not
     // scanner will parse HTML,

@@ -1,7 +1,7 @@
 {
-  "name": "SKIN.JS",
+  "name": "skin.js",
   "version": "0.0.0",
-  "description": "Skin is a collection of flexible, customizable and extendable UI components and styles for web applications",
+  "description": "user interface components and styles for web applications",
   "main": "skin.js",
   "scripts": {
     "test": "grunt test"
