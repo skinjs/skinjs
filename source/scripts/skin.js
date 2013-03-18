@@ -36,8 +36,10 @@
     var that = this
         // main data
       , data = {}
-        // loader method, should be assigned after parsing the settings
-      , require = null
+        // loader method
+      , require
+        // plugins scope
+      , plugin;
 
     // initialize
     function initialize() {
@@ -46,24 +48,21 @@
       // parse options
       settings(options);
       // assign require function for internal use
-      
+      require = settings('require');
       // preload required modules
-      
+      load(settings('preload'));
       // create the skin plugin
-    }
-
-    function configure() {
-      // assign require function for internal use
-      require = settings();
-      
+      if (plugin = settings('plugin')) plugin[settings('alias')] = (function() {
+      });
     }
 
     // load modules, handle the return value
     // if its a function, run it on this instance
     // if its data, parse and merge it to instance data
     function load(modules) {
-      load(options(['pack']), modules, function() {
-        for(var count in arguments) {
+      if (!isArray(modules)) modules = slice.call(arguments, 0);
+      require(settings('pack'), modules, function() {
+        for (var count in arguments) {
           var decorator = arguments[count];
           if (isFunction(decorator)) decorator.call(that);
           else if (isObject(decorator)) parse(decorator);
@@ -98,8 +97,13 @@
           value   = arguments[2];
           break;
         case 2:
-          // we have either pointer or index, and value
+          // we have either pointer or index, and value for setting value
+          // or pointer and index, for getting a value
+          // TODO: clean this shit
           if (isObject(arguments[0])) {
+            if (isString(arguments[1])) {
+              if (value = access(arguments[0], arguments[1])) return value;
+            }
             pointer = arguments[0];
             index   = [];
           } else {
@@ -115,12 +119,13 @@
             index   = [];
             value   = arguments[0];
           } else {
-            // TODO: parse string
+            // strings can be used both for getting or setting data
+            if (value = access(null, arguments[0])) return value;
+            // TODO: parse strings for settings values
           }
       }
       access(pointer, index, value);
     }
-
 
     // get or set value of an index path, related to the pointer
     // index path can be an array, or string chunks sliced by . or -
@@ -164,11 +169,9 @@
             // check for value in base
             while (isObject(pointer.base)) {
               pointer = pointer.base;
-              if (has.call(pointer, key)) {
-                pointer = pointer[key];
-                break;
-              }
+              if (has.call(pointer, key)) return pointer[key];
             }
+            return;
           }
         }
       }
@@ -180,7 +183,6 @@
     function actions()   { return parse.apply(that, Array(data.actions   || (data.actions   = {})).concat(slice.call(arguments, 0))) }
     function recipes()   { return parse.apply(that, Array(data.recipes   || (data.recipes   = {})).concat(slice.call(arguments, 0))) }
     function templates() { return parse.apply(that, Array(data.templates || (data.templates = {})).concat(slice.call(arguments, 0))) }
-
 
     function bind(key, type, action) {
       
@@ -208,12 +210,8 @@
     // public interface
     // ----------------
     return {
-      // capture ('option'), ('key', value) and ({key: value}) formats
-      configure: function(key, value) {
-        if (value && typeof(key) === 'string') set(key, value);
-      }
-    };
-  };
+    }
+  }
 
 
   // Skin static properties
@@ -244,7 +242,7 @@
     // the object which should hold the skin plugin
     // plugin name will be same as alias of skin instance
     // null means no plugin creation
-  , plug: root.$.fn
+  , plugin: root.$.fn
     // default method to load modules
     // based on define(), proposed by CommonJS
     // for Asynchronous Module Definition (AMD)
@@ -254,7 +252,7 @@
     // default paths for modules
   , pack: {
       baseUrl: './'
-      paths: {}
+    , paths: {}
     }
   };
 
