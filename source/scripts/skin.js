@@ -30,7 +30,7 @@
 
   // Skin class definition
   // ---------------------
-  var Skin = root.Skin = function(element, alias, settings) {
+  var Skin = root.Skin = function(options) {
     // private
     // -------
     var that = this
@@ -41,16 +41,22 @@
 
     // initialize
     function initialize() {
+      // default settings
       settings({ base: Skin.defaults });
-      // parse options, we pass array to speed up
-      
-      // assign loader function for internal use
+      // parse options
+      settings(options);
+      // assign require function for internal use
       
       // preload required modules
       
       // create the skin plugin
     }
 
+    function configure() {
+      // assign require function for internal use
+      require = settings();
+      
+    }
 
     // load modules, handle the return value
     // if its a function, run it on this instance
@@ -248,12 +254,7 @@
     // default paths for modules
   , pack: {
       baseUrl: './'
-    // TODO: this won't be needed, I kept it only for documentation
-    // , paths: {
-    //     'plug': 'plug.js'
-    //   , 'parse': 'parse.js'
-    //   , 'sense': 'sense.js'
-    //   }
+      paths: {}
     }
   };
 
