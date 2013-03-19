@@ -35,36 +35,40 @@
     var that = this
         // root data object
       , data = {}
-        // loader method
+        // data shortcuts
+      , settings  = data.settings  = {}
+      , recipes   = data.recipes   = {}
+      , actions   = data.actions   = {}
+      , templates = data.templates = {}
+        // references
       , require
-        // plugin scope
-      , plugin;
+      , plug;
 
     // initialize
     function initialize() {
       // default settings
-      settings({ base: Skin.defaults });
+      set(settings, { base: Skin.defaults });
       // parse options
-      settings(options);
+      set(settings, options);
       // assign require function implementation
-      require = settings('require');
-      // preload required modules
-      load(settings('preload'));
+      require = get(settings, 'require');
+      // load modules which should be preloaded
+      load(get(settings, 'preload'));
       // create the skin plugin
-      if (plugin = settings('plugin')) plugin[settings('alias')] = (function() {
+      if (plug = get(settings, 'plug')) plug[get(settings, 'alias')] = (function() {
       });
     }
 
-    // load modules, handle the return value
+    // load modules, and handle the return value
     // if its a function, run it on this instance context
-    // if its data, parse and merge it to instance data
+    // if its data, merge it to instance data
     function load(modules) {
       if (!isArray(modules)) modules = slice.call(arguments, 0);
-      require(settings('pack'), modules, function() {
+      require(get(settings, 'pack'), modules, function() {
         for (var count in arguments) {
           var decorator = arguments[count];
           if (isFunction(decorator)) decorator.call(that);
-          else if (isObject(decorator)) parse(decorator);
+          else if (isObject(decorator)) set(decorator);
         }
       })
     }
@@ -72,22 +76,12 @@
     // convert string index to array index
     function sanitize(index) { return (isArray(index))? index : (isString(index))? index.split(/[.-]/) : [] }
 
-    // parse and update data recursively
-    // in each recurse we should try to break down complex inputs
-    // and finally call a simple access() on each value seperately
-    // e.g. parse('key-value-a key-value-b data-c');
-    //      parse('hint-state-expose-error hint-position-bottom');
-    //      parse('hint-hide-on-body-click hint-dont-hide-on-element-focus');
-    //      parse({ templates: { a: '<p>{{a}}</p>' }, actions: { jump: function(){}}});
-    //      parse({ key: { otherKey: value }});
-    //      parse(pointer, 'key.otehrKey-anotherKey', value);
-    //      parse(pointer, ['key', 'otherKey'], value);
-    //      parse(['key', 'otherKey'], { anotherKey: value});
-    //      parse(pointer, value);
-    //      parse(pointer, { key: value });
-    //      parse('key', value);
-    function parse() {
-      var pointer, index, key, value, args = arguments;
+    // set value of an index path, related to the pointer to data objects
+    // index path can be an array, or string chunks sliced by . or -
+    function set() {
+      var pointer, index, value, key, args = arguments;
+      // find out what are the inputs
+      // if there's no pointer, we start from root data
       switch (args.length) {
         case 3:
           // we have pointer, index and value
@@ -96,91 +90,87 @@
           value   = args[2];
           break;
         case 2:
+          value   = args[1];
           // we have either pointer or index, along with value for set
-          // or pointer and index, to get a value
           if (isObject(args[0])) {
-            // we should check if second argument is string, then pass it to access for getting a value
-            // otherwise access will handle it as a set value, without index
-            if (isString(args[1]) && (value = access(args[0], args[1]))) return value;
             pointer = args[0];
             index   = [];
           } else {
-            pointer = null;
+            pointer = data;
             index   = sanitize(args[0]);
           }
-          value = args[1];
           break;
         case 1:
+          pointer = data;
+          index   = [];
           // the only argument, could be an object or string
-          if (isObject(args[0])) {
-            pointer = null;
-            index   = [];
-            value   = args[0];
-          } else {
-            // strings can be used both for getting or setting data
-            if (value = access(null, args[0])) return value;
+          if (isObject(args[0])) value = args[0];
+          else {
             // TODO: parse strings for settings values
           }
       }
-      access(pointer, index, value);
-    }
-
-    // get or set value of an index path, related to the pointer
-    // index path can be an array, or string chunks sliced by . or -
-    // we should use arrays when its possible, to speed up
-    // value should be a primitive string, array, boolean, number etc.
-    // however objects can be passed as value too, but this will
-    // result in mass assigning values, change observers won't be notified this way
-    // objects should be parsed instead
-    function access(pointer, index, value) {
-      // if there's no pointer, start from root data
-      var pointer = pointer || data
-        , index = sanitize(index)
-        , key;
-      // first handle an empty index with an object as value
+      // handle an empty index with an object as value
       // note that the value can't be assigned to the pointer directly
-      if (!index.length && isObject(value)) for (key in value) access(pointer, [key], value[key]);
+      // so if the value isn't an object, we just ignore it
+      // if the value is an object, we call set for each of its keys
+      if (!index.length && isObject(value)) for (key in value) set(pointer, [key], value[key]);
       else while (index.length) {
         key = index.shift();
-        if (arguments.length == 3) {
-          // set value
-          if (index.length) {
-            // there are still deeper levels
-            // existing or non existing keys should point to next level object
-            if (!has.call(pointer, key) || !isObject(pointer[key])) {
-              // isObject() returns false for arrays
-              // otherwise the next level object could be pushed in the existing array
-              pointer[key] = {};
-            }
-            pointer = pointer[key];
-          } else {
-            // no more levels, last key
-            // if value is null, we remove the key by convension
-            // no one wants a key pointing to null!
-            if (value == null) delete pointer[key];
-            else pointer = pointer[key] = value;
+        if (index.length) {
+          // there are still deeper levels
+          // existing or non existing keys should point to next level object
+          if (!has.call(pointer, key) || !isObject(pointer[key])) {
+            // isObject() returns false for arrays
+            // otherwise the next level object could be pushed in the existing array
+            pointer[key] = {};
           }
+          pointer = pointer[key];
         } else {
-          // get value
-          if (has.call(pointer, key)) pointer = pointer[key];
-          else {
-            // check for value in base
-            while (isObject(pointer.base)) {
-              pointer = pointer.base;
-              if (has.call(pointer, key)) return pointer[key];
-            }
-            return;
-          }
+          // no more levels, last key
+          // if value is null, we remove the key by convension
+          // no one wants a key pointing to null!
+          if (value == null) delete pointer[key];
+          else pointer = pointer[key] = value;
         }
       }
       return pointer;
     }
 
-    // data access shortcuts
-    function settings()  { return parse.apply(that, Array(data.settings  || (data.settings  = {})).concat(slice.call(arguments, 0))) }
-    function recipes()   { return parse.apply(that, Array(data.recipes   || (data.recipes   = {})).concat(slice.call(arguments, 0))) }
-    function actions()   { return parse.apply(that, Array(data.actions   || (data.actions   = {})).concat(slice.call(arguments, 0))) }
-    function templates() { return parse.apply(that, Array(data.templates || (data.templates = {})).concat(slice.call(arguments, 0))) }
+    // get value of an index path, related to the pointer to data objects
+    // index path can be an array, or string chunks sliced by . or -
+    function get() {
+      var pointer, index, key, flag, args = arguments;
+      switch (args.length) {
+        case 2:
+          // we have pointer and index
+          pointer = args[0];
+          index   = sanitize(args[1]);
+          break;
+        case 1:
+          // only index
+          pointer = data;
+          index   = sanitize(args[0]);
+      }
+      while (index.length) {
+        key = index.shift();
+        flag = false;
+        if (has.call(pointer, key)) {
+          pointer = pointer[key];
+          flag = true;
+        } else {
+          // check for value in base
+          while (isObject(pointer.base)) {
+            pointer = pointer.base;
+            if (has.call(pointer, key)) {
+              pointer = pointer[key];
+              flag = true;
+              break;
+            }
+          }
+        }
+      }
+      return (flag)? pointer : null;
+    }
 
     function bind(key, type, action) {
       
@@ -211,9 +201,8 @@
         var base;
         // if a recipe exists for the alias, ensure we have a correct base
         // otherwise create a new recipe and use it as base
-        if (base = recipes(alias)) {}
-        else base = recipes(alias, recipe);
-        console.log(data);
+        if (base = get(recipes, alias)) {}
+        else base = set(recipes, alias, recipe);
       }
     }
   }
@@ -246,7 +235,7 @@
     // the object which should hold the skin plugin
     // plugin name will be same as alias of skin instance
     // null means no plugin creation
-  , plugin: root.$.fn
+  , plug: root.$.fn
     // default method to load modules
     // based on define(), proposed by CommonJS
     // for Asynchronous Module Definition (AMD)

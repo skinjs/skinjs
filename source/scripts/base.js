@@ -1,5 +1,5 @@
 define('base', function() {
-  return {
+  return ({
     templates: {
       pane: '<div class="{{class}}">{{content}}</div>',
       panel: { base: 'pane', content: '<div class="header">{{header}}</div><div class="body">{{body}}</div><div class="footer">{{footer}}</div>' },
@@ -17,5 +17,5 @@ define('base', function() {
       slide: function() {},
       follow: function() {}
     }
-  }
+  });
 });
