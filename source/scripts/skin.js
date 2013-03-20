@@ -1,9 +1,3 @@
-// $('#foo').skin('hint', { template: '<div></div>', data: whatever.data })
-// $('#foo').hint({ template: { base: 'basic' }, data: { map: { foo: 'bar' }}})
-// $('#foo').skin('hint', { states: {  }})
-// $('#foo').hint().hide();
-// $('#foo').hint().addState('flash', { template: { base: 'flashy'}});
-
 (function() {
   "use strict";
 
@@ -32,177 +26,75 @@
   var Skin = root.Skin = function(options) {
     // private
     // -------
-    var that = this
-        // root data object
-      , data = {}
+    var _that = this
+        // root data
+      , _data = new Skin.Data()
         // data shortcuts
-      , settings  = data.settings  = {}
-      , recipes   = data.recipes   = {}
-      , actions   = data.actions   = {}
-      , templates = data.templates = {}
+        // settings, are skin instance settings, based on default settings
+        // bindings, stores connections between DOM elements and recipes, stored states, event bindings etc.
+        // recipes, are formulas for creating a component, they usually contain actions and templates
+      , _settings  = _data.set('settings' , {})
+      , _bindings  = _data.set('bindings' , {})
+      , _recipes   = _data.set('recipes'  , {})
+      , _actions   = _data.set('actions'  , {})
+      , _templates = _data.set('templates', {})
         // references
-      , require
-      , plug;
+      , _require
+      , _plug;
 
     // initialize
-    function initialize() {
+    function _initialize() {
       // default settings
-      set(settings, { base: Skin.defaults });
+      _data.set(_settings, { base: Skin.defaults });
       // parse options
-      set(settings, options);
+      _data.set(_settings, options);
       // assign require function implementation
-      require = get(settings, 'require');
+      _require = _data.get(_settings, 'require');
       // load modules which should be preloaded
-      load(get(settings, 'preload'));
+      _load(_data.get(_settings, 'preload'));
       // create the skin plugin
-      if (plug = get(settings, 'plug')) plug[get(settings, 'alias')] = (function() {
+      if (_plug = _data.get(_settings, 'plug')) _plug[_data.get(_settings, 'alias')] = (function() {
       });
     }
 
     // load modules, and handle the return value
     // if its a function, run it on this instance context
     // if its data, merge it to instance data
-    function load(modules) {
+    function _load(modules) {
       if (!isArray(modules)) modules = slice.call(arguments, 0);
-      require(get(settings, 'pack'), modules, function() {
+      _require(_data.get(_settings, 'pack'), modules, function() {
         for (var count in arguments) {
           var decorator = arguments[count];
-          if (isFunction(decorator)) decorator.call(that);
-          else if (isObject(decorator)) set(decorator);
+          if (isFunction(decorator)) decorator.call(_that);
+          else if (isObject(decorator)) _data.set(decorator);
         }
       })
     }
 
-    // convert string index to array index
-    function sanitize(index) { return (isArray(index))? index : (isString(index))? index.split(/[.-]/) : [] }
-
-    // set value of an index path, related to the pointer to data objects
-    // index path can be an array, or string chunks sliced by . or -
-    function set() {
-      var pointer, index, value, key, args = arguments;
-      // find out what are the inputs
-      // if there's no pointer, we start from root data
-      switch (args.length) {
-        case 3:
-          // we have pointer, index and value
-          pointer = args[0];
-          index   = sanitize(args[1]);
-          value   = args[2];
-          break;
-        case 2:
-          value   = args[1];
-          // we have either pointer or index, along with value for set
-          if (isObject(args[0])) {
-            pointer = args[0];
-            index   = [];
-          } else {
-            pointer = data;
-            index   = sanitize(args[0]);
-          }
-          break;
-        case 1:
-          pointer = data;
-          index   = [];
-          // the only argument, could be an object or string
-          if (isObject(args[0])) value = args[0];
-          else {
-            // TODO: parse strings for settings values
-          }
-      }
-      // handle an empty index with an object as value
-      // note that the value can't be assigned to the pointer directly
-      // so if the value isn't an object, we just ignore it
-      // if the value is an object, we call set for each of its keys
-      if (!index.length && isObject(value)) for (key in value) set(pointer, [key], value[key]);
-      else while (index.length) {
-        key = index.shift();
-        if (index.length) {
-          // there are still deeper levels
-          // existing or non existing keys should point to next level object
-          if (!has.call(pointer, key) || !isObject(pointer[key])) {
-            // isObject() returns false for arrays
-            // otherwise the next level object could be pushed in the existing array
-            pointer[key] = {};
-          }
-          pointer = pointer[key];
-        } else {
-          // no more levels, last key
-          // if value is null, we remove the key by convension
-          // no one wants a key pointing to null!
-          if (value == null) delete pointer[key];
-          else pointer = pointer[key] = value;
-        }
-      }
-      return pointer;
-    }
-
-    // get value of an index path, related to the pointer to data objects
-    // index path can be an array, or string chunks sliced by . or -
-    function get() {
-      var pointer, index, key, flag, args = arguments;
-      switch (args.length) {
-        case 2:
-          // we have pointer and index
-          pointer = args[0];
-          index   = sanitize(args[1]);
-          break;
-        case 1:
-          // only index
-          pointer = data;
-          index   = sanitize(args[0]);
-      }
-      while (index.length) {
-        key = index.shift();
-        flag = false;
-        if (has.call(pointer, key)) {
-          pointer = pointer[key];
-          flag = true;
-        } else {
-          // check for value in base
-          while (isObject(pointer.base)) {
-            pointer = pointer.base;
-            if (has.call(pointer, key)) {
-              pointer = pointer[key];
-              flag = true;
-              break;
-            }
-          }
-        }
-      }
-      return (flag)? pointer : null;
-    }
-
-    function bind(key, type, action) {
-      
-    }
-    function unbind(key, type, action) {
-      
-    }
     // chain of responsibility, ask delegates to perform something if they can
-    function can(object, action) { return has.call(object, action) && isFunction(object[action]) }
-    function ask(action) {
+    function _can(object, action) { return has.call(object, action) && isFunction(object[action]) }
+    function _ask(action) {
       // apply() lets us pass an array of arguments, unlike call() which requires each argument
-      if (can(this, action)) return this[action].apply(this, slice.call(arguments, 1));
-      else for(var count in options.delegates) {
-        var delegate = options.delegates[count];
-        if (delegate && can(delegate, action)) return delegate[action].apply(this, slice.call(arguments, 1));
+      if (_can(this, action)) return this[action].apply(this, slice.call(arguments, 1));
+      else {
+        var count, delegate, delegates = _data.get(_settings, 'delegates');
+        for(count in delegates) {
+          delegate = delegates[count];
+          if (delegate && _can(delegate, action)) return delegate[action].apply(this, slice.call(arguments, 1));
+        }
       }
       return false;
     }
 
     // execute initialize
-    initialize();
+    _initialize();
 
     // public interface
     // ----------------
     return {
       // create skin component for elements
-      cover: function(elements, alias, recipe) {
-        var base;
-        // if a recipe exists for the alias, ensure we have a correct base
-        // otherwise create a new recipe and use it as base
-        if (base = get(recipes, alias)) {}
-        else base = set(recipes, alias, recipe);
+      create: function(element, alias, recipe) {
+        // first, check if the element has a binding with this alias
       }
     }
   }
@@ -241,13 +133,15 @@
     // for Asynchronous Module Definition (AMD)
   , require: root.require || root.curl
     // preload frequently used modules to speed up things
-  , preload: ['base']
+  , preload: ['base', 'sense']
     // default paths for modules
-  , pack: {
-      baseUrl: './'
-    , paths: {}
-    }
-  };
+    // TODO: when using this file as data-main in requirejs, following is not needed
+    // I just kept it for writing the documentation later
+  // , pack: {
+  //     baseUrl: './'
+  //   , paths: {}
+  //   }
+  }
 
   // Skin static methods
   // -------------------
@@ -259,7 +153,130 @@
   Skin.noConflict = function() {
     root.Skin = oldSkin;
     return this;
-  };
+  }
+
+
+
+
+  // Data class definition
+  // ---------------------
+  Skin.Data = function(data) {
+    // private
+    // -------
+    var _data = data || {};
+
+    // convert string index to array index
+    function _sanitize(index) { return (isArray(index))? index : (isString(index))? index.split(/[.-]/) : [] }
+
+    // set value of an index path, related to the pointer to data objects
+    // index path can be an array, or string chunks sliced by . or -
+    function _set() {
+      var pointer, index, value, key, args = arguments;
+      // find out what are the inputs
+      // if there's no pointer, we start from root data
+      switch (args.length) {
+        case 3:
+          // we have pointer, index and value
+          pointer = args[0];
+          index   = _sanitize(args[1]);
+          value   = args[2];
+          break;
+        case 2:
+          value   = args[1];
+          // we have either pointer or index, along with value for set
+          if (isObject(args[0])) {
+            pointer = args[0];
+            index   = [];
+          } else {
+            pointer = _data;
+            index   = _sanitize(args[0]);
+          }
+          break;
+        case 1:
+          pointer = _data;
+          index   = [];
+          // the only argument, could be an object or string
+          if (isObject(args[0])) value = args[0];
+          else {
+            // TODO: parse strings for settings values
+          }
+      }
+      // handle an empty index with an object as value
+      // note that the value can't be assigned to the pointer directly
+      // so if the value isn't an object, we just ignore it
+      // if the value is an object, we call set for each of its keys
+      if (!index.length && isObject(value)) for (key in value) _set(pointer, [key], value[key]);
+      else while (index.length) {
+        key = index.shift();
+        if (index.length) {
+          // there are still deeper levels
+          // existing or non existing keys should point to next level object
+          if (!has.call(pointer, key) || !isObject(pointer[key])) {
+            // isObject() returns false for arrays
+            // otherwise the next level object could be pushed in the existing array
+            pointer[key] = {};
+          }
+          pointer = pointer[key];
+        } else {
+          // no more levels, last key
+          // if value is null, we remove the key by convension
+          // no one wants a key pointing to null!
+          if (value == null) delete pointer[key];
+          else pointer = pointer[key] = value;
+        }
+      }
+      return pointer;
+    }
+
+    // get value of an index path, related to the pointer to data objects
+    // index path can be an array, or string chunks sliced by . or -
+    function _get() {
+      var pointer, index, key, flag, args = arguments;
+      switch (args.length) {
+        case 2:
+          // we have pointer and index
+          pointer = args[0];
+          index   = _sanitize(args[1]);
+          break;
+        case 1:
+          // only index
+          pointer = _data;
+          index   = _sanitize(args[0]);
+          break;
+        case 0:
+          // just get everything
+          return _data;
+      }
+      while (index.length) {
+        key = index.shift();
+        flag = false;
+        if (has.call(pointer, key)) {
+          pointer = pointer[key];
+          flag = true;
+        } else {
+          // check for value in base
+          while (isObject(pointer.base)) {
+            pointer = pointer.base;
+            if (has.call(pointer, key)) {
+              pointer = pointer[key];
+              flag = true;
+              break;
+            }
+          }
+        }
+      }
+      return (flag)? pointer : null;
+    }
+
+    // public interface
+    // ----------------
+    return {
+      set: function() { return _set.apply(this, arguments) }
+    , get: function() { return _get.apply(this, arguments) }
+    }
+  }
+
+
 
 
   // View class definition
@@ -302,8 +319,8 @@
     // public
     return {
     
-    };
-  };
+    }
+  }
 
   // View static properties
   // ----------------------
@@ -311,6 +328,7 @@
   Skin.View.defaults = {
     // plugin name, unique id prefix etc.
     alias: 'view'
-  };
+  }
+
 
 }).call(this);

@@ -2,12 +2,12 @@ $(document).ready(function() {
 
   module("Skin");
 
-  test('new', 1, function() {
+  test('instantiation', 1, function() {
     var skin = new Skin({ pack: { baseUrl: '../destination/scripts' }});
     ok(skin instanceof Object, 'object is instance of class');
   });
 
-  test('noConflict', 3, function() {
+  test('manage conflicts', 3, function() {
     var NewSkin = Skin.noConflict();
     var newSkin = new NewSkin({ pack: { baseUrl: '../destination/scripts' }});
     equal(window.Skin, undefined, 'old Skin assigned back');
@@ -16,7 +16,7 @@ $(document).ready(function() {
     equal(window.Skin, NewSkin, 'new Skin assigned back');
   });
 
-  test('alias', 2, function() {
+  test('alias for plugins', 2, function() {
     var foo = new Skin({ pack: { baseUrl: '../destination/scripts' }});
     equal(typeof($.fn.skin), 'function', 'new skin plugin name is "skin" by default');
     var bar = new Skin({ alias: 'bar', pack: { baseUrl: '../destination/scripts' }});

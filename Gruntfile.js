@@ -40,6 +40,7 @@ module.exports = function(grunt) {
     uglify: {
       options: {
         beautify: true,
+        mangle: false,
         banner: '/*! <%= pkg.name %> - <%= pkg.version %> - ' + '<%= grunt.template.today("yyyy-mm-dd") %> */',
       },
       files: {
