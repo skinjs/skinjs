@@ -110,6 +110,14 @@
     return this;
   }
 
+  // create unique id for everything
+  Skin.token = -1;
+  var uniqueId = Skin.uniqueId = function(symbol) {
+    if (symbol && symbol.uniqueId) return symbol.uniqueId;
+    else if (isObject(symbol)) return symbol.uniqueId = ((symbol.alias)? symbol.alias : '') + ++Skin.token;
+    else return ((isString(symbol))? symbol : '') + ++Skin.token;
+  }
+
 
 
 
@@ -122,8 +130,7 @@
 
       // Hub private methods and properties
       // ----------------------------------
-      var subscription = {}
-        , uniqueId     = -1;
+      var subscription = {};
 
       // find and return an array of all existing subscribers for a message
       // messages are string chunks sliced by . representing a hierarchy
@@ -139,6 +146,10 @@
         return subscribers;
       }
 
+      // return or create a unique id for the sender
+      function publisherId(publisher) {
+      }
+
       return {
 
         // Hub public methods
@@ -146,7 +157,7 @@
         subscribe: function(message, callback) {
           var token;
           subscription[message] || (subscription[message] = []);
-          token = (uniqueId).toString();
+          token = uniqueId();
           subscription[message].push({ token: token, callback: callback });
           return token;
         }
@@ -321,10 +332,9 @@
   // View class
   // ==========
   var View = Skin.View = function(key, value) {
-    View.counter++;
     // private
     // -------
-    uniqueId = options.alias + '-' + View.counter;
+
     // reuseClass
     // 
     // $owner
@@ -363,7 +373,6 @@
 
   // View static methods and properties
   // ----------------------------------
-  View.counter = 0;
   View.defaults = {
     // plugin name, unique id prefix etc.
     alias: 'view'
