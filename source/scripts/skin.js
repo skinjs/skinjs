@@ -24,6 +24,7 @@
 
   // key strings
   var SETTINGS = 'settings'
+    , PLUGIN   = 'plugin'
     , REQUIRE  = 'require'
     , PRELOAD  = 'preload'
     , PACK     = 'pack';
@@ -35,24 +36,33 @@
   // ========================
   var Skin = root.Skin = function(options) {
     var that = this
-      , data = that.data = new Skin.Data();
+      , data = that.data = new Data();
     // default settings
     data.set(SETTINGS, { base: Skin.defaults });
     // parse options
-    data.set(SETTINGS, options);
-    // assign require function implementation
-    that.require = data.get(SETTINGS, REQUIRE);
+    that.configure(options);
     // load modules which should be preloaded
-    that.load(data.get(SETTINGS, PRELOAD));
+    that.fetch(data.get(SETTINGS, PRELOAD));
   }
   var Skins = Skin.prototype;
 
-  // Skin public methods and properties
-  // ----------------------------------
-  // load modules, and handle the return value
+  // Skin public methods
+  // -------------------
+  // merge in new options and perform necessary actions
+  Skins.configure = function(options) {
+    var that = this
+      , data = that.data;
+    // merge in new options
+    if (options) data.set(SETTINGS, options);
+    // assign to instance
+    that.require = data.get(SETTINGS, REQUIRE);
+    that.plugin  = data.get(SETTINGS, PLUGIN);
+  }
+
+  // fetch modules, and handle the return value
   // if its a function, run it on this instance context
   // if its data, merge it to instance data
-  Skins.load = function(modules) {
+  Skins.fetch = function(modules) {
     var that = this
       , data = that.data
       , count
@@ -71,31 +81,10 @@
   // ----------------------------------
   Skin.VERSION = '0.0.0';
   Skin.defaults = {
-    // name, used for plugin, unique id prefix etc.
+    // name, used for plugins, unique id prefix etc.
     alias: 'skin'
-    // include the scanner or not
-    // scanner will parse HTML,
-    // detects Skin related data and
-    // wires up events to states and actions
-  , scan: true
-    // include the sensor or not
-    // sensor will detect browsers supported events
-    // and hooks them into more complex ones
-  , sense: true
-    // array of delegates
-    // if a method implementation is not found in skin object
-    // it will try to call the delegate's equivalent method
-    // if the delegate failed, it will try the next delegate in array
-    // most of required actions can be delegated to external libraries
-    // such as jQuery, Zepto, Backbone, Underscore etc.
-    // we could also load a custom module which extends the skin object
-    // with custom method implementations such as
-    // extend(), select(), bind(), addClass(), removeClass(), each(), map() etc.
-  , delegates: [root.$, root._]
-    // the object which should hold the skin plugin
-    // plugin name will be same as alias of skin instance
-    // null means no plugin creation
-  , plug: root.$.fn
+    // automatically create plugins for jQuery, Zepto etc.
+  , plugin: true
     // default method to load modules
     // based on define(), proposed by CommonJS
     // for Asynchronous Module Definition (AMD)
@@ -124,21 +113,91 @@
 
 
 
-  // Skin.Data class
-  // ===============
-  Skin.Data = function(data) {
+  // Hub class
+  // =========
+  var Hub = Skin.Hub = function() {
+    // messages for publish / subscribe
+    this.subscription = {};
+    this.uniqueId = -1;
+  }
+  var Hubs = Hub.prototype;
+
+  // Hub public methods
+  // -------------------
+  Hubs.subscribe = function(message, callback) {
+    var that = this
+      , subscription = that.subscription
+      , token;
+    subscription[message] || (subscription[message] = []);
+    token = (++that.uniqueId).toString();
+    subscription[message].push({ token: token, callback: callback });
+    return token;
+  }
+
+  Hubs.unsubscribe = function(token) {
+    var that = this
+      , subscription = that.subscription
+      , message, count;
+    for (message in subscription) {
+      for (count = 0; count < subscription[message].length; count++) {
+        if (subscription[message][count].token === token) {
+          subscription[message].splice(count, 1);
+          if (!subscription[message].length) delete subscription[message];
+          return token;
+        }
+      }
+    }
+    return false;
+  }
+
+  Hubs.publish = function(message, data) {
+    var that         = this
+      , subscription = that.subscription
+      , subscribers  = that.subscribers(message)
+      , count;
+    for (count in subscribers) {
+      try {
+        subscribers[count].callback(message, data);
+      } catch(exception) {
+        throw exception;
+      }
+    }
+  }
+
+  // find and return an array of all existing subscribers for a message
+  // messages are string chunks sliced by . representing a hierarchy
+  Hubs.subscribers = function(message) {
+    if (!isString(message)) return [];
+    var that         = this
+      , subscription = that.subscription
+      , subscribers  = subscription[message] || []
+      , index        = message.lastIndexOf('.');
+    while (index !== -1) {
+      message = message.substr(0, index);
+      if (subscription[message]) subscribers.concat(subscription[message]);
+      index = message.lastIndexOf('.');
+    }
+    return subscribers;
+  }
+
+
+
+
+  // Data class
+  // ==========
+  var Data = Skin.Data = function(data) {
     this.data = data || {};
   }
-  var Datas = Skin.Data.prototype;
+  var Datas = Data.prototype;
 
-  // Skin.Data public methods and properties
-  // ---------------------------------------
+  // Data public methods
+  // -------------------
   // set value of an index path, related to the pointer to data objects
   // index path can be an array, or string chunks sliced by . or -
   Datas.set = function() {
     var data     = this.data
-      , sanitize = Skin.Data.sanitize
-      , splitter = Skin.Data.splitter
+      , sanitize = Data.sanitize
+      , splitter = Data.splitter
       , args     = arguments
       , pointer, index, value, key;
     // find out what are the inputs
@@ -180,7 +239,7 @@
     // note that the value can't be assigned to the pointer directly
     // so if the value isn't an object, we just ignore it
     // if the value is an object, we call set for each of its keys
-    if (!index.length && isObject(value)) for (key in value) set(pointer, [key], value[key]);
+    if (!index.length && isObject(value)) for (key in value) this.set(pointer, [key], value[key]);
     else while (index.length) {
       key = index.shift();
       if (index.length) {
@@ -207,7 +266,7 @@
   // index path can be an array, or string chunks sliced by . or -
   Datas.get = function() {
     var data     = this.data
-      , sanitize = Skin.Data.sanitize
+      , sanitize = Data.sanitize
       , args     = arguments
       , pointer, index, key, flag;
     if (isObject(args[0])) {
@@ -241,22 +300,22 @@
     return (flag)? pointer : null;
   }
 
-  // Skin.Data static methods and properties
-  // ---------------------------------------
+  // Data static methods and properties
+  // ----------------------------------
   // convert string index to array index
-  Skin.Data.splitter = /[\s.-]/;
-  Skin.Data.sanitize = function(index) { return (isArray(index))? index : (isString(index))? index.split(Skin.Data.splitter) : [] }
+  Data.splitter = /[\s.-]/;
+  Data.sanitize = function(index) { return (isArray(index))? index : (isString(index))? index.split(Data.splitter) : [] }
 
 
 
 
-  // Skin.View class
-  // ===============
-  Skin.View = function(key, value) {
-    Skin.View.counter++;
+  // View class
+  // ==========
+  var View = Skin.View = function(key, value) {
+    View.counter++;
     // private
     // -------
-    uniqueId = options.alias + '-' + Skin.View.counter;
+    uniqueId = options.alias + '-' + View.counter;
     // reuseClass
     // 
     // $owner
@@ -293,13 +352,16 @@
     }
   }
 
-  // View static properties
-  // ----------------------
-  Skin.View.counter = 0;
-  Skin.View.defaults = {
+  // View static methods and properties
+  // ----------------------------------
+  View.counter = 0;
+  View.defaults = {
     // plugin name, unique id prefix etc.
     alias: 'view'
   }
 
 
+
+
+  return Skin;
 }).call(this);
