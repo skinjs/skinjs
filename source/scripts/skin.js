@@ -79,7 +79,7 @@
 
   // Skin static methods and properties
   // ----------------------------------
-  Skin.VERSION = '0.0.0';
+  Skin.VERSION = '0.1.0';
   Skin.defaults = {
     // name, used for plugins, unique id prefix etc.
     alias: 'skin'
