@@ -115,70 +115,78 @@
 
   // Hub class
   // =========
-  var Hub = Skin.Hub = function() {
-    // messages for publish / subscribe
-    this.subscription = {};
-    this.uniqueId = -1;
-  }
-  var Hubs = Hub.prototype;
+  var Hub = Skin.Hub = (function() {
+    // singleton instance
+    var instance;
+    function initialize() {
 
-  // Hub public methods
-  // -------------------
-  Hubs.subscribe = function(message, callback) {
-    var that = this
-      , subscription = that.subscription
-      , token;
-    subscription[message] || (subscription[message] = []);
-    token = (++that.uniqueId).toString();
-    subscription[message].push({ token: token, callback: callback });
-    return token;
-  }
+      // Hub private methods and properties
+      // ----------------------------------
+      var subscription = {}
+        , uniqueId     = -1;
 
-  Hubs.unsubscribe = function(token) {
-    var that = this
-      , subscription = that.subscription
-      , message, count;
-    for (message in subscription) {
-      for (count = 0; count < subscription[message].length; count++) {
-        if (subscription[message][count].token === token) {
-          subscription[message].splice(count, 1);
-          if (!subscription[message].length) delete subscription[message];
+      // find and return an array of all existing subscribers for a message
+      // messages are string chunks sliced by . representing a hierarchy
+      function subscribers(message) {
+        if (!isString(message)) return [];
+        var subscribers = subscription[message] || []
+          , index       = message.lastIndexOf('.');
+        while (index !== -1) {
+          message = message.substr(0, index);
+          if (subscription[message]) subscribers.concat(subscription[message]);
+          index = message.lastIndexOf('.');
+        }
+        return subscribers;
+      }
+
+      return {
+
+        // Hub public methods
+        // ------------------
+        subscribe: function(message, callback) {
+          var token;
+          subscription[message] || (subscription[message] = []);
+          token = (uniqueId).toString();
+          subscription[message].push({ token: token, callback: callback });
           return token;
+        }
+
+      , unsubscribe: function(token) {
+          var message, count;
+          for (message in subscription) {
+            for (count = 0; count < subscription[message].length; count++) {
+              if (subscription[message][count].token === token) {
+                subscription[message].splice(count, 1);
+                if (!subscription[message].length) delete subscription[message];
+                return token;
+              }
+            }
+          }
+          return false;
+        }
+
+      , publish: function(message, data) {
+          var recipients = subscribers(message)
+            , count;
+          for (count in recipients) {
+            try {
+              recipients[count].callback(message, data);
+            } catch(exception) {
+              throw exception;
+            }
+          }
         }
       }
     }
-    return false;
-  }
 
-  Hubs.publish = function(message, data) {
-    var that         = this
-      , subscription = that.subscription
-      , subscribers  = that.subscribers(message)
-      , count;
-    for (count in subscribers) {
-      try {
-        subscribers[count].callback(message, data);
-      } catch(exception) {
-        throw exception;
+    // get or create singleton instance
+    return {
+      getInstance: function() {
+        if (!instance) instance = initialize();
+        return instance;
       }
     }
-  }
-
-  // find and return an array of all existing subscribers for a message
-  // messages are string chunks sliced by . representing a hierarchy
-  Hubs.subscribers = function(message) {
-    if (!isString(message)) return [];
-    var that         = this
-      , subscription = that.subscription
-      , subscribers  = subscription[message] || []
-      , index        = message.lastIndexOf('.');
-    while (index !== -1) {
-      message = message.substr(0, index);
-      if (subscription[message]) subscribers.concat(subscription[message]);
-      index = message.lastIndexOf('.');
-    }
-    return subscribers;
-  }
+  })();
 
 
 
@@ -186,118 +194,119 @@
   // Data class
   // ==========
   var Data = Skin.Data = function(data) {
-    this.data = data || {};
-  }
-  var Datas = Data.prototype;
 
-  // Data public methods
-  // -------------------
-  // set value of an index path, related to the pointer to data objects
-  // index path can be an array, or string chunks sliced by . or -
-  Datas.set = function() {
-    var data     = this.data
-      , sanitize = Data.sanitize
-      , splitter = Data.splitter
-      , args     = arguments
-      , pointer, index, value, key;
-    // find out what are the inputs
-    // if there's no pointer, we start from root data
-    switch (args.length) {
-      case 3:
-        // we have pointer, index and value
+    // Data private methods and properties
+    // -----------------------------------
+    var data = data || {}
+      , hub  = Hub.getInstance();
+
+    // Data public methods
+    // -------------------
+    // set value of an index path, related to the pointer to data objects
+    // index path can be an array, or string chunks sliced by . or -
+    this.set = function() {
+      var sanitize = Data.sanitize
+        , splitter = Data.splitter
+        , args     = arguments
+        , pointer, index, value, key;
+      // find out what are the inputs
+      // if there's no pointer, we start from root data
+      switch (args.length) {
+        case 3:
+          // we have pointer, index and value
+          pointer = args[0];
+          index   = sanitize(args[1]);
+          value   = args[2];
+          break;
+        case 2:
+          value   = args[1];
+          // we have either pointer or index, along with value for set
+          if (isObject(args[0])) {
+            pointer = args[0];
+            index   = [];
+          } else {
+            pointer = data;
+            index   = sanitize(args[0]);
+          }
+          break;
+        case 1:
+          pointer = data;
+          index   = [];
+          // the only argument, could be an object or string
+          if (isObject(args[0])) value = args[0];
+          else if (isString(args[0])) {
+            if (splitter.test(args[0])) {
+              // TODO: parse strings for settings values
+            } else {
+              // only a single key has been passed in
+              // create an empty object for that key if it doesn't exist
+              data[args[0]] || (data[args[0]] = {});
+            }
+          }
+      }
+      // handle an empty index with an object as value
+      // note that the value can't be assigned to the pointer directly
+      // so if the value isn't an object, we just ignore it
+      // if the value is an object, we call set for each of its keys
+      if (!index.length && isObject(value)) for (key in value) this.set(pointer, [key], value[key]);
+      else while (index.length) {
+        key = index.shift();
+        if (index.length) {
+          // there are still deeper levels
+          // existing or non existing keys should point to next level object
+          if (!has.call(pointer, key) || !isObject(pointer[key])) {
+            // isObject() returns false for arrays
+            // otherwise the next level object could be pushed in the existing array
+            pointer[key] = {};
+          }
+          pointer = pointer[key];
+        } else {
+          // no more levels, last key
+          // if value is null, we remove the key by convension
+          // no one wants a key pointing to null!
+          if (value == null) delete pointer[key];
+          else pointer = pointer[key] = value;
+        }
+      }
+      return pointer;
+    }
+
+    // get value of an index path, related to the pointer to data objects
+    // index path can be an array, or string chunks sliced by . or -
+    this.get = function() {
+      var sanitize = Data.sanitize
+        , args     = arguments
+        , pointer, index, key, flag;
+      if (isObject(args[0])) {
         pointer = args[0];
         index   = sanitize(args[1]);
-        value   = args[2];
-        break;
-      case 2:
-        value   = args[1];
-        // we have either pointer or index, along with value for set
-        if (isObject(args[0])) {
-          pointer = args[0];
-          index   = [];
-        } else {
-          pointer = data;
-          index   = sanitize(args[0]);
-        }
-        break;
-      case 1:
+      } else if (args.length) {
+        // first argument should be an index anyways,
+        // other arguments can be pushed in index array as well
+        // this way we can use data.get('a', 'b', 'c', 'd');
         pointer = data;
-        index   = [];
-        // the only argument, could be an object or string
-        if (isObject(args[0])) value = args[0];
-        else if (isString(args[0])) {
-          if (splitter.test(args[0])) {
-            // TODO: parse strings for settings values
-          } else {
-            // only a single key has been passed in
-            // create an empty object for that key if it doesn't exist
-            data[args[0]] || (data[args[0]] = {});
-          }
-        }
-    }
-    // handle an empty index with an object as value
-    // note that the value can't be assigned to the pointer directly
-    // so if the value isn't an object, we just ignore it
-    // if the value is an object, we call set for each of its keys
-    if (!index.length && isObject(value)) for (key in value) this.set(pointer, [key], value[key]);
-    else while (index.length) {
-      key = index.shift();
-      if (index.length) {
-        // there are still deeper levels
-        // existing or non existing keys should point to next level object
-        if (!has.call(pointer, key) || !isObject(pointer[key])) {
-          // isObject() returns false for arrays
-          // otherwise the next level object could be pushed in the existing array
-          pointer[key] = {};
-        }
-        pointer = pointer[key];
-      } else {
-        // no more levels, last key
-        // if value is null, we remove the key by convension
-        // no one wants a key pointing to null!
-        if (value == null) delete pointer[key];
-        else pointer = pointer[key] = value;
-      }
-    }
-    return pointer;
-  }
-
-  // get value of an index path, related to the pointer to data objects
-  // index path can be an array, or string chunks sliced by . or -
-  Datas.get = function() {
-    var data     = this.data
-      , sanitize = Data.sanitize
-      , args     = arguments
-      , pointer, index, key, flag;
-    if (isObject(args[0])) {
-      pointer = args[0];
-      index   = sanitize(args[1]);
-    } else if (args.length) {
-      // first argument should be an index anyways,
-      // other arguments can be pushed in index array as well
-      // this way we can use data.get('a', 'b', 'c', 'd');
-      pointer = data;
-      index   = sanitize(args[0]).concat(slice.call(args, 1));
-    } else return data;
-    while (index.length) {
-      key = index.shift();
-      flag = false;
-      if (has.call(pointer, key)) {
-        pointer = pointer[key];
-        flag = true;
-      } else {
-        // check for value in base
-        while (isObject(pointer.base)) {
-          pointer = pointer.base;
-          if (has.call(pointer, key)) {
-            pointer = pointer[key];
-            flag = true;
-            break;
+        index   = sanitize(args[0]).concat(slice.call(args, 1));
+      } else return data;
+      while (index.length) {
+        key = index.shift();
+        flag = false;
+        if (has.call(pointer, key)) {
+          pointer = pointer[key];
+          flag = true;
+        } else {
+          // check for value in base
+          while (isObject(pointer.base)) {
+            pointer = pointer.base;
+            if (has.call(pointer, key)) {
+              pointer = pointer[key];
+              flag = true;
+              break;
+            }
           }
         }
       }
+      return (flag)? pointer : null;
     }
-    return (flag)? pointer : null;
   }
 
   // Data static methods and properties

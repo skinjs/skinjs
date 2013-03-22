@@ -2,11 +2,17 @@ $(document).ready(function() {
 
   module("Hub");
 
-  test('instantiation', 1, function() {
-    var hub = new Skin.Hub();
-    console.log(hub);
-    ok (hub instanceof Object, 'object is instance of class');
+  test('simple subscribe, unsubscribe and publish', 2, function() {
+    var hub       = Skin.Hub.getInstance();
+    var modified  = false;
+    var modify    = function() { modified = true; };
+    var token     = hub.subscribe('foo', modify);
+    hub.publish('foo', 'bar');
+    ok (modified, 'subscription created and published, callback was invoked');
+    modified      = false;
+    hub.unsubscribe(token);
+    hub.publish('foo', 'bar');
+    ok (!modified, 'subscription removed and published, callback was not invoked');
   });
-
 
 });
