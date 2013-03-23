@@ -12,26 +12,20 @@ $(document).ready(function() {
     equal (predefinedData.get(), predefined, 'data returns its root data object');
   });
 
-  test('access by pointer and string index', 2, function() {
-    var predefined = { foo: { bar: 'baz' }}
-      , data       = new Skin.Data(predefined);
-    equal (data.get('foo'), predefined.foo, 'get data by pointer and string index');
+  test('access data', 5, function() {
+    var root = { foo: { bar: 'baz' }}
+      , data = new Skin.Data(root);
 
-    data.set(predefined.foo, 'bar.baz', { bax: [1, 2, 3] });
-    equal (data.get(predefined.foo, 'bar.baz.bax'), predefined.foo.bar.baz.bax, 'set data by pointer and string index');
-  });
+    equal (data.get('foo'), root.foo, 'get data by pointer and string index');
 
-  test('access by pointer and array index', 2, function() {
-    var predefined = { foo: { bar: 'baz' }}
-      , data       = new Skin.Data(predefined);
-    equal (data.get(['foo']), predefined.foo, 'get data by pointer and array index');
+    data.set(root.foo, 'bar.baz', { bax: [1, 2, 3] });
+    equal (data.get(root.foo, 'bar.baz.bax'), root.foo.bar.baz.bax, 'set data by pointer and string index');
 
-    data.set(predefined.foo, ['bar', 'baz'], { bax: [1, 2, 3] });
-    equal (data.get(predefined.foo, ['bar', 'baz', 'bax']), predefined.foo.bar.baz.bax, 'set data by pointer and array index');
-  });
+    equal (data.get(['foo']), root.foo, 'get data by pointer and array index');
 
-  test('access by string index', 1, function() {
-    var data = new Skin.Data();
+    data.set(root.foo, ['boo', 'koo'], { goo: 'hello' });
+    equal (data.get(root.foo, ['boo', 'koo', 'goo']), root.foo.boo.koo.goo, 'set data by pointer and array index');
+
     data.set('a.b.c', { d: { e: 'f' }});
     equal (data.get('a-b-c-d-e'), 'f', 'get and set data by string index');
   });
@@ -46,33 +40,33 @@ $(document).ready(function() {
 
   test('match data', 14, function() {
     var func = function() {}
-      , subObject = { w: { a: 1, b: 2 }, x: true, y: false, z: func }
-      , object = { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: subObject, f: false };
-    ok (Skin.Data.match({ a: 1 }, object), 'simple match');
-    ok (!Skin.Data.match({ a: 2 }, object), 'simple mismatch');
+      , sub  = { w: { a: 1, b: 2 }, x: true, y: false, z: func }
+      , root = { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false };
+    ok (Skin.Data.match({ a: 1 }, root), 'simple match');
+    ok (!Skin.Data.match({ a: 2 }, root), 'simple mismatch');
 
-    ok (Skin.Data.match({ a: 1, b: 2 }, object), 'all match for any conditions');
-    ok (Skin.Data.match({ a: 1, b: 1, s: 3, e: false }, object), 'any match for any conditions');
-    ok (!Skin.Data.match({ a: 0, b: 1, s: 3, e: false }, object), 'all mismatch for any conditions');
+    ok (Skin.Data.match({ a: 1, b: 2 }, root), 'all match for any conditions');
+    ok (Skin.Data.match({ a: 1, b: 1, s: 3, e: false }, root), 'any match for any conditions');
+    ok (!Skin.Data.match({ a: 0, b: 1, s: 3, e: false }, root), 'all mismatch for any conditions');
 
-    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}}, object, false), 'all match for all conditions');
-    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bax', a: { b: 1 }}}, object, false), 'any mismatch for all conditions');
-    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1, c: true }}}, object, false), 'extra key, value mismatch for all conditions');
-    ok (Skin.Data.match({ a: 1, b: 2, e: subObject }, object, false), 'referenced match for all conditions');
+    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}}, root, false), 'all match for all conditions');
+    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bax', a: { b: 1 }}}, root, false), 'any mismatch for all conditions');
+    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1, c: true }}}, root, false), 'extra key, value mismatch for all conditions');
+    ok (Skin.Data.match({ a: 1, b: 2, e: sub }, root, false), 'referenced match for all conditions');
 
-    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: { w: { a: 1, b: 2 }, x: true, y: false, z: func }, f: false }, object, true), 'all match for exact method');
-    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: subObject, f: false }, object, true), 'referenced match for exact method');
-    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: subObject, f: false }, object, true), 'any mismatch for exact method');
-    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, e: subObject, f: false }, object, true), 'missing key, value mismatch for exact method');
-    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: subObject, f: false, g: { foo: 'bar' }}, object, true), 'extra key, value mismatch for exact method');
+    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: { w: { a: 1, b: 2 }, x: true, y: false, z: func }, f: false }, root, true), 'all match for exact method');
+    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false }, root, true), 'referenced match for exact method');
+    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false }, root, true), 'any mismatch for exact method');
+    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, e: sub, f: false }, root, true), 'missing key, value mismatch for exact method');
+    ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false, g: { foo: 'bar' }}, root, true), 'extra key, value mismatch for exact method');
   });
 
-  // test('find by pointer, index and condition', 1, function() {
-  //   var root       = { a: 1000, z: 0 }
-  //     , predefined = { b: { c: 'baz' }}
-  //     , data       = new Skin.Data(root);
-  //   data.set('z', { a: { b: 1, c: 'foo', p: predefined, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}});
-  //   data.find(root.z, 'a.p', { c: 'baz' });
-  // });
+  test('find data', 1, function() {
+    var root = { a: 1000, z: 0 }
+      , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
+      , data = new Skin.Data(root);
+    data.set('z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}});
+    equal (data.find(root.z, 'a.p', { message: 'hello' })[0], 'good', 'found the index of direct child, using pointer, index and condition');
+  });
 
 });

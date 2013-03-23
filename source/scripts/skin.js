@@ -336,15 +336,15 @@
   }
 
   // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
-  // and return the key of containing child
-  // first arguments can be a sub branch pointer, index, optional
+  // and return array of keys of containing children
+  // first optional arguments can be sub branch pointer, index, just like get() method
   // followed by the condition object { key: value }
   // last boolean argument indicates if we should search recursively, default is false
-  // in this case, the result would be an array of indices
   Datas.find = function() {
     var that     = this
       , args     = slice.call(arguments, 0)
-      , pointer, condition, recursive, result, key, value, match;
+      , result   = []
+      , pointer, condition, recursive, key;
     recursive = args.slice(-1)[0];
     if (isBoolean(recursive)) {
       args = args.slice(0, -1);
@@ -352,10 +352,11 @@
     condition = args.slice(-1)[0];
     args = args.slice(0, -1);
     pointer = that.get.apply(that, args);
-    if (isObject(pointer)) {
-      
+    for (key in pointer) {
+      if (Data.match(condition, pointer[key])) result.push(key);
     }
     // TODO: implement recursive
+    return result;
   }
 
   // Data static methods and properties
@@ -391,6 +392,7 @@
       }
     }
 
+    // inverse check, in exact match all target keys should have been covered
     if (method == true) for (key in object) if (isUndefined(condition[key])) return false;
     if (isUndefined(method)) return matched;
     else return true;
