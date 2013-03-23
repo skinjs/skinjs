@@ -351,11 +351,13 @@
     } else recursive = false;
     condition = args.slice(-1)[0];
     args = args.slice(0, -1);
-    pointer = that.get.apply(that, args);
+    pointer = (args.length == 1)? args[0] : that.get.apply(that, args);
     for (key in pointer) {
+      // searching in direct children
       if (Data.match(condition, pointer[key])) result.push(key);
+      // search recursively in deeper levels
+      // TODO: implement this
     }
-    // TODO: implement recursive
     return result;
   }
 

@@ -61,12 +61,16 @@ $(document).ready(function() {
     ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false, g: { foo: 'bar' }}, root, true), 'extra key, value mismatch for exact method');
   });
 
-  test('find data', 1, function() {
+  test('find data', 5, function() {
     var root = { a: 1000, z: 0 }
       , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
       , data = new Skin.Data(root);
     data.set('z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}});
-    equal (data.find(root.z, 'a.p', { message: 'hello' })[0], 'good', 'found the index of direct child, using pointer, index and condition');
+    equal (data.find(root.z, 'a.p', { message: 'hello' })[0], 'good', 'found the index of direct child, using pointer, string index and condition');
+    equal (data.find(root.z, ['a', 'p'], { message: 'goodbye' })[0], 'bad', 'found the index of direct child, using pointer, array index and condition');
+    equal (data.find(root.z.a.p, { foo: 'bar' }).length, 2, 'found the indices of direct children, using pointer and condition');
+    equal (data.find(root, 'z-a', { b: 1 }).length, 1, 'found, using pointer, string index and condition');
+    equal (data.find(root, 'z-a', { b: 2 }).length, 0, 'not found, using pointer, string index and condition');
   });
 
 });
