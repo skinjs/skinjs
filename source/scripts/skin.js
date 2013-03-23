@@ -17,15 +17,19 @@
     , has       = Objects.hasOwnProperty;
 
   // helpers for internal use
-  function isArray(symbol)    { return symbol instanceof Array }
-  function isString(symbol)   { return typeof(symbol) === 'string' }
-  function isFunction(symbol) { return typeof(symbol) === 'function' }
-  function isBoolean(symbol)  { return typeof(symbol) === 'boolean' }
-  function isObject(symbol)   { return symbol != null && typeof(symbol) === 'object' && !isArray(symbol) }
-  function isNode(symbol)     { return symbol != null && symbol.nodeType }
+  function isArray(symbol)     { return symbol instanceof Array }
+  function isString(symbol)    { return typeof(symbol) === 'string' }
+  function isFunction(symbol)  { return typeof(symbol) === 'function' }
+  function isBoolean(symbol)   { return typeof(symbol) === 'boolean' }
+  function isUndefined(symbol) { return typeof(symbol) === 'undefined' }
+  function isObject(symbol)    { return symbol != null && typeof(symbol) === 'object' && !isArray(symbol) }
+  function isNode(symbol)      { return symbol != null && symbol.nodeType }
 
   // key strings
-  var SETTINGS = 'settings'
+  var UID      = 'uid'
+    , ALIAS    = 'alias'
+    , SETTINGS = 'settings'
+    , NODES    = 'nodes'
     , BASE     = 'base'
     , PLUGIN   = 'plugin'
     , REQUIRE  = 'require'
@@ -38,46 +42,46 @@
   // Skin class and namespace
   // ========================
   var Skin = root.Skin = function(options) {
-    var that = this
-      , data = that.data = new Data();
+
+    // Skin private methods and properties
+    // -----------------------------------
+    var that     = this
+      , data     = new Data()
+      , settings = {};
     // default settings
-    data.set(SETTINGS, { base: Skin.defaults });
+    settings[BASE] = Skin.defaults;
+    data.set(SETTINGS, settings);
     // parse options
-    that.configure(options);
+    configure(options);
     // load modules which should be preloaded
-    that.fetch(data.get(SETTINGS, PRELOAD));
-  }
-  var Skins = Skin.prototype;
+    fetch(data.get(SETTINGS, PRELOAD));
 
-  // Skin public methods
-  // -------------------
-  // merge in new options and perform necessary actions
-  Skins.configure = function(options) {
-    var that = this
-      , data = that.data;
-    // merge in new options
-    if (options) data.set(SETTINGS, options);
-    // assign to instance
-    that.require = data.get(SETTINGS, REQUIRE);
-    that.plugin  = data.get(SETTINGS, PLUGIN);
-  }
+    // merge in new options and perform necessary actions
+    function configure(options) {
+      // merge in new options
+      if (options) data.set(SETTINGS, options);
+      // assign to instance
+      that.require = data.get(SETTINGS, REQUIRE);
+      that.plugin  = data.get(SETTINGS, PLUGIN);
+    }
 
-  // fetch modules, and handle the return value
-  // if its a function, run it on this instance context
-  // if its data, merge it to instance data
-  Skins.fetch = function(modules) {
-    var that = this
-      , data = that.data
-      , count
-      , decorator;
-    if (!isArray(modules)) modules = slice.call(arguments, 0);
-    require(data.get(SETTINGS, PACK), modules, function() {
-      for (count in arguments) {
-        decorator = arguments[count];
-        if (isFunction(decorator)) decorator.call(that);
-        else if (isObject(decorator)) data.set(decorator);
-      }
-    })
+    // fetch modules, and handle the return value
+    // if its a function, run it on this instance context, decorator
+    // if its data, merge it to instance data
+    function fetch(modules) {
+      var count, module;
+      if (!isArray(modules)) modules = slice.call(arguments, 0);
+      require(data.get(SETTINGS, PACK), modules, function() {
+        for (count in arguments) {
+          module = arguments[count];
+          if (isFunction(module)) module.call(that);
+          else if (isObject(module)) data.set(module);
+        }
+      })
+    }
+
+    // Skin public methods
+    // -------------------
   }
 
   // Skin static methods and properties
@@ -114,13 +118,9 @@
   }
 
   // create unique id for everything
-  Skin.token = -1;
-  var uniqueId = Skin.uniqueId = function(symbol) {
-    if (symbol) {
-      if (symbol.uniqueId) return symbol.uniqueId;
-      //else if (isNode(symbol)) return Skin.node(symbol).uniqueId || Skin.node(symbol, { uniqueId: ++Skin.token });
-      else if (isObject(symbol)) return symbol.uniqueId = ((symbol.alias)? symbol.alias : '') + ++Skin.token;
-    }
+  Skin.token = -1
+  Skin.uid = function(symbol) {
+    if (isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++Skin.token);
     return ((isString(symbol))? symbol : '') + ++Skin.token;
   }
 
@@ -335,14 +335,16 @@
     return (flag)? pointer : null;
   }
 
-  // find { 'key': value } pairs and return their index paths
-  // first arguments can be a sub branch pointer and / or index, optional
-  // next argument would be the condition { 'key': value }
-  // last argument indicates if we should search recursively, boolean, default is false
+  // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
+  // and return the key of containing child
+  // first arguments can be a sub branch pointer, index, optional
+  // followed by the condition object { key: value }
+  // last boolean argument indicates if we should search recursively, default is false
+  // in this case, the result would be an array of indices
   Datas.find = function() {
     var that     = this
       , args     = slice.call(arguments, 0)
-      , pointer, condition, recursive, result;
+      , pointer, condition, recursive, result, key, value, match;
     recursive = args.slice(-1)[0];
     if (isBoolean(recursive)) {
       args = args.slice(0, -1);
@@ -350,7 +352,10 @@
     condition = args.slice(-1)[0];
     args = args.slice(0, -1);
     pointer = that.get.apply(that, args);
-    
+    if (isObject(pointer)) {
+      
+    }
+    // TODO: implement recursive
   }
 
   // Data static methods and properties
@@ -358,6 +363,38 @@
   // convert string index to array index
   Data.splitter = /[\s.-]/;
   Data.sanitize = function(index) { return (isArray(index))? index : (isString(index))? index.split(Data.splitter) : [] }
+
+  // match two objects, methods can be any, all and exact
+  // no method (default) means matching any of the conditions is enough
+  // method: false, all of the conditions should match
+  // method: true, means exact match, two given objects should contain exactly the same content tree
+  Data.match = function(condition, object, method) {
+    // speed check
+    if (condition === object) return true;
+    var key, matched = false;
+    // simple check if all keys exist for exact or all matching methods
+    // before going into costly recursive matching
+    if (isBoolean(method)) for (key in condition) if (isUndefined(object[key])) return false;
+
+    // now go through every key
+    for (key in condition) {
+      if (condition[key]) {
+        if (isObject(condition[key]) || isArray(condition[key])) {
+          if (Data.match(condition[key], object[key], method)) matched = true;
+          else if (isBoolean(method)) return false;
+        } else {
+          if (condition[key] == object[key]) matched = true;
+          else if (isBoolean(method)) return false;
+        }
+      } else {
+        if (method == true && object[key]) return false;
+      }
+    }
+
+    if (method == true) for (key in object) if (isUndefined(condition[key])) return false;
+    if (isUndefined(method)) return matched;
+    else return true;
+  }
 
 
 

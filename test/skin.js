@@ -8,21 +8,21 @@ $(document).ready(function() {
   });
 
   test('unique id generation', 6, function() {
-    var firstId  = Skin.uniqueId()
-      , secondId = Skin.uniqueId();
+    var firstId  = Skin.uid()
+      , secondId = Skin.uid();
     notEqual(firstId, secondId, 'generated ids are unique');
 
-    var thirdId = Skin.uniqueId('prefix')
-      , forthId = Skin.uniqueId('prefix');
+    var thirdId = Skin.uid('prefix')
+      , forthId = Skin.uid('prefix');
     notEqual(thirdId, forthId, 'generated ids with prefix are unique');
 
-    var firstObject  = { uniqueId: 'foo' }
+    var firstObject  = { uid: 'foo' }
       , secondObject = { alias: 'bar' }
       , thirdObject  = {};
-    equal(Skin.uniqueId(firstObject), 'foo', 'returned existing unique id');
-    ok(/bar\d/.test(Skin.uniqueId(secondObject)), 'returned unique id based on alias');
-    ok(/\d/.test(Skin.uniqueId(thirdObject)), 'returned bare unique id');
-    ok(/\d/.test(thirdObject.uniqueId), 'stored unique id in object');
+    equal(Skin.uid(firstObject), 'foo', 'returned existing unique id');
+    ok(/bar\d/.test(Skin.uid(secondObject)), 'returned unique id based on alias');
+    ok(/\d/.test(Skin.uid(thirdObject)), 'returned bare unique id');
+    ok(/\d/.test(thirdObject.uid), 'stored unique id in object');
   });
 
   test('avoid conflicts', 3, function() {
