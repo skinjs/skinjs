@@ -26,15 +26,16 @@
   function isNode(symbol)      { return symbol != null && symbol.nodeType }
 
   // key strings
-  var UID      = 'uid'
-    , ALIAS    = 'alias'
-    , SETTINGS = 'settings'
-    , NODES    = 'nodes'
-    , BASE     = 'base'
-    , PLUGIN   = 'plugin'
-    , REQUIRE  = 'require'
-    , PRELOAD  = 'preload'
-    , PACK     = 'pack';
+  var UID       = 'uid'
+    , PUBLISHER = 'publisher'
+    , ALIAS     = 'alias'
+    , SETTINGS  = 'settings'
+    , NODES     = 'nodes'
+    , BASE      = 'base'
+    , PLUGIN    = 'plugin'
+    , REQUIRE   = 'require'
+    , PRELOAD   = 'preload'
+    , PACK      = 'pack';
 
 
 
@@ -118,11 +119,12 @@
   }
 
   // create unique id for everything
-  Skin.token = -1
-  Skin.uid = function(symbol) {
-    if (isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++Skin.token);
-    return ((isString(symbol))? symbol : '') + ++Skin.token;
-  }
+  var token = Skin.token = -1
+    , uid = Skin.uid = function(symbol) {
+      // TODO: stored uid on dom elements should be removed at some point
+      if (isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++Skin.token);
+      return ((isString(symbol))? symbol : '') + ++Skin.token;
+    }
 
 
 
@@ -157,17 +159,12 @@
         // Hub public methods
         // ------------------
         subscribe: function(publisher, message, callback) {
-          
-          var publisherId = uniqueId(publisher);
-
-          subscriptions[publisherId] || (subscriptions[publisherId] = []);
-          var subscription = {
-                publisher: publisher
-              , message: message
-              , callback: callback
-              , index: subscriptions[publisherId].length
-              };
-          subscriptions[publisherId].push(subscription);
+          var publisherUid = uid(publisher);
+          subscriptions.get(publisherUid) || subscriptions.set([publisherUid, PUBLISHER], publisher);
+          subscriptions.set(publisherUid, message, [callback]);
+          console.log(subscriptions);
+          // subscriptions[publisherId].push(subscription);
+          //subscriptions.set(uid(publisher), message, [callback]);
         }
 
       , unsubscribe: function(publisher, message, callback) {
@@ -222,48 +219,88 @@
 
   // Data public methods
   // -------------------
-  // set value of an index path, related to the pointer to data objects
+  // get the pointer to an index path, related to the starting pointer
   // index path can be an array, or string chunks sliced by . or -
-  Datas.set = function() {
-    var data     = this.data
-      , hub      = Hub.getInstance()
-      , sanitize = Data.sanitize
-      , args     = arguments
-      , pointer, index, value, key;
-    // find out what are the inputs
-    // if there's no pointer, we start from root data
-    switch (args.length) {
-      case 3:
-        // we have pointer, index and value
-        pointer = args[0];
-        index   = sanitize(args[1]);
-        value   = args[2];
-        break;
-      case 2:
-        value   = args[1];
-        // we have either pointer or index, along with value for set
-        if (isObject(args[0])) {
-          pointer = args[0];
-          index   = [];
-        } else {
-          pointer = data;
-          index   = sanitize(args[0]);
-        }
-        break;
-      case 1:
-        pointer = data;
-        index   = [];
-        // the only argument, could be an object or string
-        if (isObject(args[0])) value = args[0];
-        else if (isString(args[0])) {
-          if (Data.splitter.test(args[0])) {
-            // TODO: parse strings for settings values
-          } else {
-            // only a single key has been passed in
-            // create an empty object for that key if it doesn't exist
-            data[args[0]] || (data[args[0]] = {});
+  // returns null if the path doesn't exist
+  // get(sanitize, pointer, index, otherIndices)
+  Datas.get = function() {
+    var args     = slice.call(arguments, 0)
+      , pointer  = this.data
+      , sanitize = true
+      , index, key, flag;
+    // we can disable sanitizing of index, when index is a valid array
+    // this can optimize speed for internal use
+    if (isBoolean(args[0])) {
+      sanitize = args[0];
+      args = args.slice(1);
+    }
+    if (isObject(args[0])) {
+      pointer = args[0];
+      args = args.slice(1);
+    }
+    if (!sanitize) index = args[0];
+    else if (args.length) index = Data.sanitize(args);
+    else return pointer;
+    while (index.length) {
+      key = index.shift();
+      flag = false;
+      if (has.call(pointer, key)) {
+        pointer = pointer[key];
+        flag = true;
+      } else {
+        // check for value in base
+        while (isObject(pointer[BASE])) {
+          pointer = pointer[BASE];
+          if (has.call(pointer, key)) {
+            pointer = pointer[key];
+            flag = true;
+            break;
           }
         }
+      }
+    }
+    return (flag)? pointer : null;
+  }
+
+  // set value for an index path, related to the starting pointer
+  // index path can be an array, or string chunks sliced by . or -
+  // returns pointer to the last modified object or array
+  // set(sanitize, pointer, index, other indices, value)
+  Datas.set = function() {
+    var args     = slice.call(arguments, 0)
+      , pointer  = this.data
+      , sanitize = true
+      , index, key, value;
+    // last argument is always the value
+    value = args.slice(-1)[0];
+    args = args.slice(0, -1);
+    // we can disable sanitizing of index, when index is a valid array
+    // this can optimize speed for internal use
+    if (args.length) {
+      if (isBoolean(args[0])) {
+        sanitize = args[0];
+        args = args.slice(1);
+      }
+      if (isObject(args[0])) {
+        pointer = args[0];
+        args = args.slice(1);
+      }
+      if (!sanitize) index = args[0];
+      else if (args.length) index = Data.sanitize(args);
+      else index = [];
+    } else {
+      index = [];
+      // if value is a single string and there's no pointer or index
+      // we parse the string for special cases
+      if (isString(value)) {
+        if (Data.splitter.test(args[0])) {
+          // TODO: parse strings for settings values
+        } else {
+          // only a single key has been passed in, no other arguments
+          // create an empty object for that key if it doesn't exist
+          pointer = pointer[value] || (pointer[value] = {});
+        }
+      }
     }
     // handle an empty index with an object as value
     // note that the value can't be assigned to the pointer directly
@@ -297,44 +334,6 @@
     return pointer;
   }
 
-  // get value of an index path, related to the pointer to data objects
-  // index path can be an array, or string chunks sliced by . or -
-  Datas.get = function() {
-    var data     = this.data
-      , sanitize = Data.sanitize
-      , args     = arguments
-      , pointer, index, key, flag;
-    if (isObject(args[0])) {
-      pointer = args[0];
-      index   = sanitize(args[1]);
-    } else if (args.length) {
-      // first argument should be an index anyways,
-      // other arguments can be pushed in index array as well
-      // this way we can use data.get('a', 'b', 'c', 'd');
-      pointer = data;
-      index   = sanitize(args[0]).concat(slice.call(args, 1));
-    } else return data;
-    while (index.length) {
-      key = index.shift();
-      flag = false;
-      if (has.call(pointer, key)) {
-        pointer = pointer[key];
-        flag = true;
-      } else {
-        // check for value in base
-        while (isObject(pointer[BASE])) {
-          pointer = pointer[BASE];
-          if (has.call(pointer, key)) {
-            pointer = pointer[key];
-            flag = true;
-            break;
-          }
-        }
-      }
-    }
-    return (flag)? pointer : null;
-  }
-
   // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
   // and return array of keys of containing children
   // first optional arguments can be sub branch pointer, index, just like get() method
@@ -363,14 +362,21 @@
 
   // Data static methods and properties
   // ----------------------------------
-  // convert string index to array index
+  // sanitize mixed index, data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
   Data.splitter = /[\s.-]/;
-  Data.sanitize = function(index) { return (isArray(index))? index : (isString(index))? index.split(Data.splitter) : [] }
+  Data.sanitize = function() {
+    var args = arguments, index = [], count;
+    for (count in args)
+      index = (isString(args[count]))? index.concat(args[count].split(Data.splitter))
+            : (isArray(args[count]))? index.concat(Data.sanitize.apply(this, args[count]))
+            : index;
+    return index;
+  }
 
-  // match two objects, methods can be any, all and exact
-  // no method (default) means matching any of the conditions is enough
-  // method: false, all of the conditions should match
-  // method: true, means exact match, two given objects should contain exactly the same content tree
+  // check if object meets a condition, methods can be any, all and exact
+  // method undefined (default) means if any of the conditions matched return true
+  // method false, means all of the conditions should match
+  // method true, means exact match, hence two given objects should contain exactly the same content tree
   Data.match = function(condition, object, method) {
     // speed check
     if (condition === object) return true;
@@ -392,6 +398,8 @@
       } else {
         if (method == true && object[key]) return false;
       }
+      // speed pass if method is any and we have a match, no need to continue the loop
+      if (isUndefined(method) && matched) return true;
     }
 
     // inverse check, in exact match all target keys should have been covered

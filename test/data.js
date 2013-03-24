@@ -12,6 +12,11 @@ $(document).ready(function() {
     equal (predefinedData.get(), predefined, 'data returns its root data object');
   });
 
+  test('sanitize index', 1, function() {
+    var index = Skin.Data.sanitize('a', 'b.c', ['d.e', 'f-g-h', ['i', 'j'], 'k'], 'l', 'm', 'n', ['o', 'p'], 'q', 'r', ['s.t.u.v'], 'w x', 'y', ['z']);
+    equal (index.length, 26, 'sanitized mixed index path');
+  });
+
   test('access data', 5, function() {
     var root = { foo: { bar: 'baz' }}
       , data = new Skin.Data(root);

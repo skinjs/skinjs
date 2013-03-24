@@ -3,10 +3,10 @@ $(document).ready(function() {
   module("Hub");
 
   test('simple subscribe, unsubscribe and publish', 2, function() {
-    var hub       = Skin.Hub.getInstance();
-    var modified  = false;
-    var modify    = function() { modified = true; };
-    var token     = hub.subscribe('foo', modify);
+    var hub       = Skin.Hub.getInstance()
+      , modified  = false
+      , modify    = function() { modified = true; };
+    hub.subscribe(this, 'foo.bar', modify);
     hub.publish('foo', 'bar');
     ok (modified, 'subscription created and published, callback was invoked');
     modified      = false;
