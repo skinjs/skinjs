@@ -293,8 +293,8 @@
       // if value is a single string and there's no pointer or index
       // we parse the string for special cases
       if (isString(value)) {
-        if (Data.splitter.test(args[0])) {
-          // TODO: parse strings for settings values
+        if (Data.splitter.test(value)) {
+          // TODO: parse strings for some magic!
         } else {
           // only a single key has been passed in, no other arguments
           // create an empty object for that key if it doesn't exist
@@ -303,10 +303,10 @@
       }
     }
     // handle an empty index with an object as value
-    // note that the value can't be assigned to the pointer directly
-    // so if the value isn't an object, we just ignore it
+    // the value can't be assigned to the pointer directly
+    // hence, if the value isn't an object we just ignore it
     // if the value is an object, we call set for each of its keys
-    if (!index.length && isObject(value)) for (key in value) this.set(pointer, [key], value[key]);
+    if (!index.length && isObject(value)) for (key in value) this.set(false, pointer, [key], value[key]);
     else while (index.length) {
       key = index.shift();
       if (index.length) {

@@ -17,22 +17,39 @@ $(document).ready(function() {
     equal (index.length, 26, 'sanitized mixed index path');
   });
 
-  test('access data', 5, function() {
+  test('access data', 10, function() {
     var root = { foo: { bar: 'baz' }}
       , data = new Skin.Data(root);
 
-    equal (data.get('foo'), root.foo, 'get data by pointer and string index');
+    equal (data.get(root.foo, 'bar'), 'baz', 'get data by pointer and string index');
 
-    data.set(root.foo, 'bar.baz', { bax: [1, 2, 3] });
-    equal (data.get(root.foo, 'bar.baz.bax'), root.foo.bar.baz.bax, 'set data by pointer and string index');
+    data.set(root.foo, 'bar.baz', { boo: [1, 2, 3] });
+    equal (data.get(root.foo, 'bar.baz.boo'), root.foo.bar.baz.boo, 'set data by pointer and string index');
 
-    equal (data.get(['foo']), root.foo, 'get data by pointer and array index');
+    equal (data.get(root.foo, ['bar']), root.foo.bar, 'get data by pointer and array index');
 
     data.set(root.foo, ['boo', 'koo'], { goo: 'hello' });
     equal (data.get(root.foo, ['boo', 'koo', 'goo']), root.foo.boo.koo.goo, 'set data by pointer and array index');
 
     data.set('a.b.c', { d: { e: 'f' }});
     equal (data.get('a-b-c-d-e'), 'f', 'get and set data by string index');
+
+    data.set(root.foo, ['z', ['y.x', 'w'], 'v'], { t: 's' });
+    equal (data.get('foo z y x', 'w', ['v.t']), 's', 'get and set data by mixed index');
+
+    data.set('newData');
+    ok (data.get('newData') instanceof Object, 'new empty data object was set under root');
+
+    var someData  = { foo: 'barrr', boo: 'bazzz' }
+      , otherData = { someData: someData }
+    data.set('someKey', 'someOtherKey', otherData);
+    equal (data.get('someKey.someOtherKey', 'someData.foo'), 'barrr', 'mixed access');
+
+    var basedData = { base: someData }
+    data.set('myBasedData', basedData);
+    equal (data.get(basedData, 'boo'), 'bazzz', 'access to based on reference data');
+    data.set('myBasedData', 'foo', 'barr');
+    equal (data.get(basedData, 'foo'), 'barr', 'modify a value in based on reference data');
   });
 
   test('remove, non existing data', 2, function() {
