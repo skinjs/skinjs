@@ -223,19 +223,12 @@
   // get the pointer to an index path, related to the starting pointer
   // index path can be an array, or string chunks sliced by . or -
   // returns null if the path doesn't exist
-  // get(sanitize, pointer, index, create)
+  // get(sanitize, pointer, index)
   Datas.get = function() {
     var args     = slice.call(arguments, 0)
       , pointer  = this.data
       , sanitize = true
-      , index, key, flag, create;
-    // create mode, default is false
-    // if true, get() will create an empty path
-    // when the index doesn't exist
-    create = args.slice(-1)[0];
-    if (isBoolean(create)) {
-      args = args.slice(0, -1);
-    } else create = false;
+      , index, key, flag;
     // we can disable sanitizing of index, when index is a valid array
     // this can optimize speed for internal use
     if (isBoolean(args[0])) {
@@ -253,10 +246,7 @@
     while (index.length) {
       key = index.shift();
       flag = false;
-      if (create && (!has.call(pointer, key) || !isObject(pointer[key]))) {
-        // create mode
-        pointer = pointer[key] = {};
-      } else if (has.call(pointer, key)) {
+      if (has.call(pointer, key)) {
         pointer = pointer[key];
         flag = true;
       } else {
@@ -271,7 +261,7 @@
         }
       }
     }
-    return (flag || create)? pointer : null;
+    return (flag)? pointer : null;
   }
 
   // set value for an index path, related to the starting pointer
@@ -287,10 +277,13 @@
     value = args.slice(-1)[0];
     args = args.slice(0, -1);
     if (args.length) {
+      // we can disable sanitizing of index, when index is a valid array
+      // this can optimize speed for internal use
       if (isBoolean(args[0])) {
         sanitize = args[0];
         args = args.slice(1);
       }
+      // any object left at the beginning of arguments should be the pointer
       if (isObject(args[0])) {
         pointer = args[0];
         args = args.slice(1);
@@ -316,23 +309,31 @@
     // hence, if the value isn't an object we just ignore it
     // if the value is an object, we call set for each of its keys
     if (!index.length && isObject(value)) for (key in value) this.set(false, pointer, [key], value[key]);
-    else {
-      // trim the last key then pass the pointer and remaining index
-      // to get() with create mode, no need to sanitize again
-      key = index.pop();
-      pointer = this.get(false, pointer, index, true);
-      // if value is null, we remove the key by convension
-      // no one wants a key pointing to null!
-      if (value == null) delete pointer[key];
-      else if (key != BASE && isObject(value) && isObject(pointer[key])) {
-        // merge two objects, if the value isn't the base reference
+    else while (index.length) {
+      key = index.shift();
+      if (index.length) {
+        // there are stil deeper levels
+        if (!has.call(pointer, key) || !isObject(pointer[key])) {
+          // isObject() returns false for arrays
+          // otherwise the next level object could be pushed in the existing array
+          pointer[key] = {};
+        }
         pointer = pointer[key];
-        for (key in value) this.set(false, pointer, [key], value[key]);
-      // } else if (isArray(value) && isArray(pointer[key])) {
-      //   // merge two arrays
+      } else {
+        // no more levels, last key
+        // if value is null, we remove the key by convension
+        // no one wants a key pointing to null!
+        if (value == null) delete pointer[key];
+        else if (key != BASE && isObject(value) && isObject(pointer[key])) {
+          // merge two objects, if the value isn't the base reference
+          pointer = pointer[key];
+          for (key in value) this.set(false, pointer, [key], value[key]);
+        } else if (isArray(value) && isArray(pointer[key])) {
+          // merge two arrays
+        }
+        // replace or create the value
+        else pointer = pointer[key] = value;
       }
-      // replace or create the value
-      else pointer = pointer[key] = value;
     }
     return pointer;
   }
@@ -411,6 +412,7 @@
     if (isUndefined(method)) return matched;
     else return true;
   }
+
 
 
 
