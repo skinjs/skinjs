@@ -51,8 +51,8 @@ $(document).ready(function() {
       , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
 
     Data.set(root, 'z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}})
-    equal(Data.find(root.z, 'a.p', { message: 'hello' })[0].index[0], 'good', 'found the index of direct child, using pointer, string index and condition')
-    equal(Data.find(root.z, ['a', 'p'], { message: 'goodbye' })[0].index[0], 'bad', 'found the index of direct child, using pointer, array index and condition')
+    equal(Data.find(root.z, 'a.p', { message: 'hello' })[0], sub.good, 'found the index of direct child, using pointer, string index and condition')
+    equal(Data.find(root.z, ['a', 'p'], { message: 'goodbye' })[0], sub.bad, 'found the index of direct child, using pointer, array index and condition')
     equal(Data.find(root.z.a.p, { foo: 'bar' }).length, 2, 'found the indices of direct children, using pointer and condition')
 
     equal(Data.find(root, 'z-a', { b: 1 }).length, 1, 'found, using pointer, string index and condition')

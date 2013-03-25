@@ -161,15 +161,19 @@
       , unsubscribe: function() {
           var args        = slice.call(arguments, 0)
             , condition   = {}
-            , subscribers = subscriptions.get()
-            , publisher, message, callback;
+            , subscribers = subscriptions
+            , publisher, message, callback
+
           if (isObject(args[0])) {
             publisher = args[0];
             args = args.slice(1);
+            subscribers = subscriptions[uid(publisher)] || {}
           }
           if (isString(args[0])) {
             message = args[0];
             args = args.slice(1);
+            condition[CALLBACKS] = '*';
+            subscribers = Data.find(subscribers, message, condition);
           }
           if (isFunction(args[0])) {
             callback = args[0];
@@ -186,7 +190,7 @@
           subscribers = Data.find(subscriptions, publisherUid, message, condition, true);
           // calling callbacks
           for (subscriber in subscribers) {
-            callbacks = subscribers[subscriber][POINTER][CALLBACKS];
+            callbacks = subscribers[subscriber][CALLBACKS];
             for (callback in callbacks) {
               try {
                 // TODO: if a callback returns false break the chain
@@ -233,15 +237,9 @@
 
     // used by public find() method
     // results is an array passed by reference
-    function look(results, index, pointer, condition, recursive) {
-      var result, key;
-      if (match(condition, pointer)) {
-        result = {};
-        result[POINTER] = pointer;
-        result[INDEX]   = index;
-        results.push(result);
-      }
-      if (recursive && isObject(pointer)) for (key in pointer) look(results, index.concat([key]), pointer[key], condition, recursive);
+    function look(results, pointer, condition, recursive) {
+      if (match(condition, pointer)) results.push(pointer);
+      if (recursive && isObject(pointer)) for (var key in pointer) look(results, pointer[key], condition, recursive);
     }
 
     // check if object meets a condition, methods can be any, all and exact
@@ -403,8 +401,8 @@
       }
 
       // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
-      // and returns array of { pointer: pointer, index: index } of containing children
-      // first optional arguments can be sanitize, pointer, index, will be passed to get() method
+      // and returns array of pointers to containing children
+      // first arguments can be sanitize, pointer, index, will be passed to get() method
       // followed by the condition object { key: value }
       // last boolean argument indicates if we should search children recursively, default is false
       // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
@@ -422,7 +420,7 @@
         args = args.slice(0, -1);
         // remainings can be passed to get()
         pointer = this.get.apply(this, args);
-        if (isObject(pointer)) for (key in pointer) look(results, [key], pointer[key], condition, recursive);
+        if (isObject(pointer)) for (key in pointer) look(results, pointer[key], condition, recursive);
         return results;
       }
     }
