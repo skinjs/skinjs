@@ -162,6 +162,7 @@
           var publisherUid = uid(publisher);
           subscriptions.get(publisherUid) || subscriptions.set([publisherUid, PUBLISHER], publisher);
           subscriptions.set(publisherUid, message, [callback]);
+          subscriptions.set(publisherUid, message, [callback]);
           console.log(subscriptions);
           // subscriptions[publisherId].push(subscription);
           //subscriptions.set(uid(publisher), message, [callback]);
@@ -222,18 +223,26 @@
   // get the pointer to an index path, related to the starting pointer
   // index path can be an array, or string chunks sliced by . or -
   // returns null if the path doesn't exist
-  // get(sanitize, pointer, index, otherIndices)
+  // get(sanitize, pointer, index, create)
   Datas.get = function() {
     var args     = slice.call(arguments, 0)
       , pointer  = this.data
       , sanitize = true
-      , index, key, flag;
+      , index, key, flag, create;
+    // create mode, default is false
+    // if true, get() will create an empty path
+    // when the index doesn't exist
+    create = args.slice(-1)[0];
+    if (isBoolean(create)) {
+      args = args.slice(0, -1);
+    } else create = false;
     // we can disable sanitizing of index, when index is a valid array
     // this can optimize speed for internal use
     if (isBoolean(args[0])) {
       sanitize = args[0];
       args = args.slice(1);
     }
+    // any object left at the beginning of arguments should be the pointer
     if (isObject(args[0])) {
       pointer = args[0];
       args = args.slice(1);
@@ -244,7 +253,10 @@
     while (index.length) {
       key = index.shift();
       flag = false;
-      if (has.call(pointer, key)) {
+      if (create && (!has.call(pointer, key) || !isObject(pointer[key]))) {
+        // create mode
+        pointer = pointer[key] = {};
+      } else if (has.call(pointer, key)) {
         pointer = pointer[key];
         flag = true;
       } else {
@@ -259,13 +271,13 @@
         }
       }
     }
-    return (flag)? pointer : null;
+    return (flag || create)? pointer : null;
   }
 
   // set value for an index path, related to the starting pointer
   // index path can be an array, or string chunks sliced by . or -
   // returns pointer to the last modified object or array
-  // set(sanitize, pointer, index, other indices, value)
+  // set(sanitize, pointer, index, value)
   Datas.set = function() {
     var args     = slice.call(arguments, 0)
       , pointer  = this.data
@@ -274,8 +286,6 @@
     // last argument is always the value
     value = args.slice(-1)[0];
     args = args.slice(0, -1);
-    // we can disable sanitizing of index, when index is a valid array
-    // this can optimize speed for internal use
     if (args.length) {
       if (isBoolean(args[0])) {
         sanitize = args[0];
@@ -286,12 +296,11 @@
         args = args.slice(1);
       }
       if (!sanitize) index = args[0];
-      else if (args.length) index = Data.sanitize(args);
-      else index = [];
+      else index = Data.sanitize(args);
     } else {
-      index = [];
       // if value is a single string and there's no pointer or index
       // we parse the string for special cases
+      index = [];
       if (isString(value)) {
         if (Data.splitter.test(value)) {
           // TODO: parse strings for some magic!
@@ -307,29 +316,23 @@
     // hence, if the value isn't an object we just ignore it
     // if the value is an object, we call set for each of its keys
     if (!index.length && isObject(value)) for (key in value) this.set(false, pointer, [key], value[key]);
-    else while (index.length) {
-      key = index.shift();
-      if (index.length) {
-        // there are still deeper levels
-        // existing or non existing keys should point to next level object
-        if (!has.call(pointer, key) || !isObject(pointer[key])) {
-          // isObject() returns false for arrays
-          // otherwise the next level object could be pushed in the existing array
-          pointer[key] = {};
-        }
+    else {
+      // trim the last key then pass the pointer and remaining index
+      // to get() with create mode, no need to sanitize again
+      key = index.pop();
+      pointer = this.get(false, pointer, index, true);
+      // if value is null, we remove the key by convension
+      // no one wants a key pointing to null!
+      if (value == null) delete pointer[key];
+      else if (key != BASE && isObject(value) && isObject(pointer[key])) {
+        // merge two objects, if the value isn't the base reference
         pointer = pointer[key];
-      } else {
-        // no more levels, last key
-        // if value is null, we remove the key by convension
-        // no one wants a key pointing to null!
-        if (value == null) delete pointer[key];
-        else if (key != BASE && isObject(value) && isObject(pointer[key])) {
-          // merge two objects
-          pointer = pointer[key];
-          for (key in value) this.set(pointer, [key], value[key]);
-        }
-        else pointer = pointer[key] = value;
+        for (key in value) this.set(false, pointer, [key], value[key]);
+      // } else if (isArray(value) && isArray(pointer[key])) {
+      //   // merge two arrays
       }
+      // replace or create the value
+      else pointer = pointer[key] = value;
     }
     return pointer;
   }
@@ -377,6 +380,7 @@
   // method undefined (default) means if any of the conditions matched return true
   // method false, means all of the conditions should match
   // method true, means exact match, hence two given objects should contain exactly the same content tree
+  // TODO: implement BASE and MAP
   Data.match = function(condition, object, method) {
     // speed check
     if (condition === object) return true;
