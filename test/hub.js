@@ -8,7 +8,7 @@ $(document).ready(function() {
       , modify    = function() { modified = true; };
     hub.subscribe(this, 'foo.bar', modify);
     hub.publish(this, 'foo', 'bar');
-    ok (modified, 'subscription created and published, callback was invoked');
+    ok(modified, 'subscription created and published, callback was invoked');
     // modified      = false;
     // hub.unsubscribe(token);
     // hub.publish('foo', 'bar');

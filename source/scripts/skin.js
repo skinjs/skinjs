@@ -121,8 +121,10 @@
   }
 
   // create unique id for everything
+  // zero is reserved for null
   var token = Skin.token = -1
     , uid = Skin.uid = function(symbol) {
+      if (symbol == null) return '0';
       // TODO: stored uid on dom elements should be removed at some point
       if (isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++Skin.token);
       return ((isString(symbol))? symbol : '') + ++Skin.token;
@@ -147,31 +149,43 @@
         // Hub public methods
         // ------------------
         subscribe: function(publisher, message, callback) {
-          var publisherUid = uid(publisher)
-            , callbacks    = subscriptions.get(publisherUid, message, CALLBACKS) || subscriptions.set(publisherUid, message, CALLBACKS, []);
+          var publisherUid = uid(publisher), callbacks;
+          // create a node for publisher if it doesn't exist
+          subscriptions.get(publisherUid) || subscriptions.set(publisherUid, PUBLISHER, publisher);
+          // get or create callbacks with the message path as index
+          callbacks = subscriptions.get(publisherUid, message, CALLBACKS) || subscriptions.set(publisherUid, message, CALLBACKS, []);
+          // add the callback
           callbacks.push(callback);
         }
 
-      , unsubscribe: function(publisher, message, callback) {
-          var message, count;
-          for (message in subscription) {
-            for (count = 0; count < subscription[message].length; count++) {
-              if (subscription[message][count].token === token) {
-                subscription[message].splice(count, 1);
-                if (!subscription[message].length) delete subscription[message];
-                return token;
-              }
-            }
+        // example: unsubscribe(publisher, message, callback)
+      , unsubscribe: function() {
+          var args        = slice.call(arguments, 0)
+            , condition   = {}
+            , subscribers = subscriptions.get()
+            , publisher, message, callback;
+          if (isObject(args[0])) {
+            publisher = args[0];
+            args = args.slice(1);
           }
-          return false;
+          if (isString(args[0])) {
+            message = args[0];
+            args = args.slice(1);
+          }
+          if (isFunction(args[0])) {
+            callback = args[0];
+            args = args.slice(1);
+          }
         }
 
       , publish: function(publisher, message, data) {
           var publisherUid = uid(publisher)
             , condition    = {}
             , subscribers, subscriber, callbacks, callback;
+          // set condition and finding callbacks in sub branches
           condition[CALLBACKS] = '*';
           subscribers = subscriptions.find(publisherUid, message, condition, true);
+          // calling callbacks
           for (subscriber in subscribers) {
             callbacks = subscribers[subscriber][POINTER][CALLBACKS];
             for (callback in callbacks) {
@@ -340,7 +354,7 @@
       , pointer, index, key, childKey, result, condition, recursive;
     // recursive should be the last argument, if its boolean
     recursive = args.slice(-1)[0];
-    if (isBoolean(args.slice(-1)[0])) {
+    if (isBoolean(recursive)) {
       args = args.slice(0, -1);
     } else recursive = false;
     // then the condition
@@ -356,6 +370,7 @@
   // ----------------------------------
   // sanitize mixed index
   // example: data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
+  // TODO: optimize this, unnecessary complication
   Data.splitter = /[\s.-]/;
   Data.sanitize = function() {
     var args = arguments, index = [], count;
@@ -481,5 +496,4 @@
 
 
 
-  return Skin;
 }).call(this);
