@@ -27,6 +27,7 @@
 
   // key strings
   var UID       = 'uid'
+    , CALLBACKS = 'callbacks'
     , PUBLISHER = 'publisher'
     , ALIAS     = 'alias'
     , SETTINGS  = 'settings'
@@ -110,9 +111,9 @@
 
   // assign cached Skin back and return this object
   // should be at the beginning of other codes
-  // e.g. var NewSkin = Skin.noConflict();
-  //      var newSkin = new NewSkin({alias: 'newSkin'});
-  //      var Skin    = { someOtherObject: 'should be defined after Skin.noConflict()' }
+  // example: var NewSkin = Skin.noConflict();
+  //          var newSkin = new NewSkin({alias: 'newSkin'});
+  //          var Skin    = { someOtherObject: 'should be defined after Skin.noConflict()' }
   Skin.noConflict = function() {
     root.Skin = oldSkin;
     return this;
@@ -159,13 +160,9 @@
         // Hub public methods
         // ------------------
         subscribe: function(publisher, message, callback) {
-          var publisherUid = uid(publisher);
-          subscriptions.get(publisherUid) || subscriptions.set([publisherUid, PUBLISHER], publisher);
-          subscriptions.set(publisherUid, message, [callback]);
-          subscriptions.set(publisherUid, message, [callback]);
-          console.log(subscriptions);
-          // subscriptions[publisherId].push(subscription);
-          //subscriptions.set(uid(publisher), message, [callback]);
+          var publisherUid = uid(publisher)
+            , callbacks    = subscriptions.get(publisherUid, message, CALLBACKS) || subscriptions.set(publisherUid, message, CALLBACKS, []);
+          if (!callbacks.indexOf(callback)) callbacks.push(callback);
         }
 
       , unsubscribe: function(publisher, message, callback) {
@@ -182,8 +179,9 @@
           return false;
         }
 
-      , publish: function(message, data) {
-          var recipients = subscribers(message)
+      , publish: function(publisher, message) {
+          var publisherUid = uid(publisher)
+            , callbacks    = subscriptions.get(subscription, message, CALLBACKS)
             , count;
           for (count in recipients) {
             try {
@@ -223,7 +221,7 @@
   // get the pointer to an index path, related to the starting pointer
   // index path can be an array, or string chunks sliced by . or -
   // returns null if the path doesn't exist
-  // get(sanitize, pointer, index)
+  // example: get(sanitize, pointer, index)
   Datas.get = function() {
     var args     = slice.call(arguments, 0)
       , pointer  = this.data
@@ -251,6 +249,7 @@
         flag = true;
       } else {
         // check for value in base
+        // TODO: implement MAP
         while (isObject(pointer[BASE])) {
           pointer = pointer[BASE];
           if (has.call(pointer, key)) {
@@ -267,7 +266,7 @@
   // set value for an index path, related to the starting pointer
   // index path can be an array, or string chunks sliced by . or -
   // returns pointer to the last modified object or array
-  // set(sanitize, pointer, index, value)
+  // example: set(sanitize, pointer, index, value)
   Datas.set = function() {
     var args     = slice.call(arguments, 0)
       , pointer  = this.data
@@ -328,8 +327,6 @@
           // merge two objects, if the value isn't the base reference
           pointer = pointer[key];
           for (key in value) this.set(false, pointer, [key], value[key]);
-        } else if (isArray(value) && isArray(pointer[key])) {
-          // merge two arrays
         }
         // replace or create the value
         else pointer = pointer[key] = value;
@@ -343,6 +340,7 @@
   // first optional arguments can be sub branch pointer, index, just like get() method
   // followed by the condition object { key: value }
   // last boolean argument indicates if we should search recursively, default is false
+  // example: data.find(pointer, index, { key: 'value' }, true);
   Datas.find = function() {
     var that     = this
       , args     = slice.call(arguments, 0)
@@ -366,7 +364,8 @@
 
   // Data static methods and properties
   // ----------------------------------
-  // sanitize mixed index, data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
+  // sanitize mixed index
+  // example: data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
   Data.splitter = /[\s.-]/;
   Data.sanitize = function() {
     var args = arguments, index = [], count;
@@ -381,30 +380,39 @@
   // method undefined (default) means if any of the conditions matched return true
   // method false, means all of the conditions should match
   // method true, means exact match, hence two given objects should contain exactly the same content tree
+  // example: Data.match({ foo: 'bar', boo: someObject }, anotherObject, false);
   // TODO: implement BASE and MAP
   Data.match = function(condition, object, method) {
     // speed check
     if (condition === object) return true;
-    var key, matched = false;
+    var key, matched;
     // simple check if all keys exist for exact or all matching methods
     // before going into costly recursive matching
     if (isBoolean(method)) for (key in condition) if (isUndefined(object[key])) return false;
 
     // now go through every key
     for (key in condition) {
+      matched = false;
       if (condition[key]) {
-        if (isObject(condition[key]) || isArray(condition[key])) {
-          if (Data.match(condition[key], object[key], method)) matched = true;
-          else if (isBoolean(method)) return false;
-        } else {
-          if (condition[key] == object[key]) matched = true;
-          else if (isBoolean(method)) return false;
-        }
+        // wild card, any value
+        if (condition[key] == '*' && has.call(object, key)) matched = true;
+        // recursive match for arrays and objects
+        else if ((isObject(condition[key]) || isArray(condition[key]))
+             && (Data.match(condition[key], object[key], method))) matched = true;
+        // filter function
+        else if ((isFunction(condition[key]))
+             && (condition[key](object[key]))) matched = true;
+        // simple compare
+        else if (condition[key] == object[key]) matched = true;
+        // if method is any and we have a match
+        // or method is all or exact and we don't have a match
+        // no need to continue the loop
+        if (matched && isUndefined(method)) return true;
+        if (!matched && isBoolean(method)) return false;
       } else {
+        // if method is exact and object has a key condition doesn't
         if (method == true && object[key]) return false;
       }
-      // speed pass if method is any and we have a match, no need to continue the loop
-      if (isUndefined(method) && matched) return true;
     }
 
     // inverse check, in exact match all target keys should have been covered

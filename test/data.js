@@ -60,7 +60,7 @@ $(document).ready(function() {
     ok (!data.get('a').hasOwnProperty('b'), 'set null removes the index');
   });
 
-  test('match data', 14, function() {
+  test('match data', 18, function() {
     var func = function() {}
       , sub  = { w: { a: 1, b: 2 }, x: true, y: false, z: func }
       , root = { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false };
@@ -76,11 +76,16 @@ $(document).ready(function() {
     ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1, c: true }}}, root, false), 'extra key, value mismatch for all conditions');
     ok (Skin.Data.match({ a: 1, b: 2, e: sub }, root, false), 'referenced match for all conditions');
 
-    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: { w: { a: 1, b: 2 }, x: true, y: false, z: func }, f: false }, root, true), 'all match for exact method');
+    ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: { w: { a: 1, b: 2 }, x: true, y: false, z: function(symbol) { return true }}, f: false }, root, true), 'all match for exact method');
     ok (Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false }, root, true), 'referenced match for exact method');
     ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false }, root, true), 'any mismatch for exact method');
     ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, e: sub, f: false }, root, true), 'missing key, value mismatch for exact method');
     ok (!Skin.Data.match({ a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false, g: { foo: 'bar' }}, root, true), 'extra key, value mismatch for exact method');
+
+    ok (Skin.Data.match({ a: 1, b: '*' }, root, false), 'wild card match for all conditions');
+    ok (!Skin.Data.match({ a: 1, g: '*' }, root, false), 'wild card mismatch for all conditions');
+    ok (Skin.Data.match({ a: 1, b: function(value) { return value == 2 }}, root, false), 'filter function match for all conditions');
+    ok (!Skin.Data.match({ a: 1, b: function(value) { return value == 3 }}, root, false), 'filter function mismatch for all conditions');
   });
 
   test('find data', 5, function() {
