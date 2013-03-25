@@ -1,3 +1,8 @@
+// skin.js 0.1.0
+// © 2013 Soheil Jadidian
+// skin.js may be freely distributed under the MIT license
+// http://skinjs.org
+
 (function() {
   "use strict";
 
@@ -222,8 +227,7 @@
 
     // Data private methods and properties
     // -----------------------------------
-    // sanitize mixed index
-    // example: data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
+    // sanitize index, convert multi arguments or chunked string to array
     // TODO: optimize this, unnecessary complication
     var splitter = /[\s.-]/
     function sanitize() {
@@ -233,59 +237,6 @@
               : (isArray(args[count]))? index.concat(sanitize.apply(this, args[count]))
               : index;
       return index;
-    }
-
-    // used by public find() method
-    // results is an array passed by reference
-    function look(results, pointer, condition, recursive) {
-      if (match(condition, pointer)) results.push(pointer);
-      if (recursive && isObject(pointer)) for (var key in pointer) look(results, pointer[key], condition, recursive);
-    }
-
-    // check if object meets a condition, methods can be any, all and exact
-    // method undefined (default) means if any of the conditions matched return true
-    // method false, means all of the conditions should match
-    // method true, means exact match, hence two given objects should contain exactly the same content tree
-    // example: Data.match({ foo: 'bar', boo: someObject }, anotherObject, false);
-    // TODO: implement BASE and MAP
-    function match(condition, object, method) {
-      // speed check
-      if (condition === object) return true;
-      var key, matched;
-      // simple check if all keys exist for exact or all matching methods
-      // before going into costly recursive matching
-      if (isBoolean(method)) for (key in condition) if (isUndefined(object[key])) return false;
-
-      // now go through every key
-      for (key in condition) {
-        matched = false;
-        if (condition[key]) {
-          // wild card, any value
-          if (condition[key] == '*' && has.call(object, key)) matched = true;
-          // recursive match for arrays and objects
-          else if ((isObject(condition[key]) || isArray(condition[key]))
-               && (Data.match(condition[key], object[key], method))) matched = true;
-          // filter function, only if object[key] is not a function itself
-          // if it is, we simply compare two functions
-          else if (isFunction(condition[key]) && !isFunction(object[key])
-               && condition[key](object[key])) matched = true;
-          // simple compare
-          else if (condition[key] == object[key]) matched = true;
-          // if method is any and we have a match
-          // or method is all or exact and we don't have a match
-          // no need to continue the loop
-          if (matched && isUndefined(method)) return true;
-          if (!matched && isBoolean(method)) return false;
-        } else {
-          // if method is exact and object has a key condition doesn't
-          if (method == true && object[key]) return false;
-        }
-      }
-
-      // inverse check, in exact match all target keys should have been covered
-      if (method == true) for (key in object) if (isUndefined(condition[key])) return false;
-      if (isUndefined(method)) return matched;
-      else return true;
     }
 
     return {
@@ -407,9 +358,10 @@
       // last boolean argument indicates if we should search children recursively, default is false
       // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
     , find: function() {
-        var args     = slice.call(arguments, 0)
-          , results  = []
-          , pointer, index, key, childKey, result, condition, recursive;
+        var that    = this
+          , args    = slice.call(arguments, 0)
+          , results = []
+          , pointer, key, result, condition, recursive;
         // recursive should be the last argument, if its boolean
         recursive = args.slice(-1)[0];
         if (isBoolean(recursive)) {
@@ -420,8 +372,67 @@
         args = args.slice(0, -1);
         // remainings can be passed to get()
         pointer = this.get.apply(this, args);
-        if (isObject(pointer)) for (key in pointer) look(results, pointer[key], condition, recursive);
+        // recursive part, results is passed by reference
+        var pick = function(results, pointer, condition, recursive) {
+          if (that.match(pointer, condition)) results.push(pointer);
+          if (recursive && isObject(pointer)) for (key in pointer) pick(results, pointer[key], condition, recursive);
+        }
+        if (isObject(pointer)) for (key in pointer) pick(results, pointer[key], condition, recursive);
         return results;
+      }
+
+      // filter an array of objects, keep those which match a condition
+    , filter: function(collection, condition, method) {
+        for (var count = 0; count < collection.length; count++) {
+          if (this.match(collection[count], condition, method)) collection = collection.splice(count, 1);
+        }
+        return collection;
+      }
+
+      // check if target object meets a condition, methods can be any, all and exact
+      // method undefined (default) means if any of the conditions matched return true
+      // method false, means all of the conditions should match
+      // method true, means exact match, hence two given objects should contain exactly the same content tree
+      // example: Data.match(target, { foo: 'bar', boo: someObject }, false);
+      // TODO: implement BASE and MAP
+    , match: function(target, condition, method) {
+        // speed check
+        if (condition === target) return true;
+        var key, matched;
+        // simple check if all keys exist for exact or all matching methods
+        // before going into costly recursive matching
+        if (isBoolean(method)) for (key in condition) if (isUndefined(target[key])) return false;
+
+        // now go through every key
+        for (key in condition) {
+          matched = false;
+          if (condition[key]) {
+            // wild card, any value
+            if (condition[key] == '*' && has.call(target, key)) matched = true;
+            // recursive match for arrays and objects
+            else if ((isObject(condition[key]) || isArray(condition[key]))
+                 && (Data.match(condition[key], target[key], method))) matched = true;
+            // filter function, only if object[key] is not a function itself
+            // if it is, we simply compare two functions
+            else if (isFunction(condition[key]) && !isFunction(target[key])
+                 && condition[key](target[key])) matched = true;
+            // simple compare
+            else if (condition[key] == target[key]) matched = true;
+            // if method is any and we have a match
+            // or method is all or exact and we don't have a match
+            // no need to continue the loop
+            if (matched && isUndefined(method)) return true;
+            if (!matched && isBoolean(method)) return false;
+          } else {
+            // if method is exact and object has a key condition doesn't
+            if (method == true && target[key]) return false;
+          }
+        }
+
+        // inverse check, in exact match all target keys should have been covered
+        if (method == true) for (key in target) if (isUndefined(condition[key])) return false;
+        if (isUndefined(method)) return matched;
+        else return true;
       }
     }
   })();

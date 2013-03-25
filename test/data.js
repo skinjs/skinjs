@@ -36,7 +36,7 @@ $(document).ready(function() {
     equal(Data.get(data.myBasedData, 'boo'), 'bazzz', 'access to based on reference data')
     Data.set(data, 'myBasedData', 'foo', 'barr')
     equal(Data.get(data.myBasedData, 'foo'), 'barr', 'modify a value in based on reference data')
-  });
+  })
 
   test('remove, non existing data', 2, function() {
     var data = {}
@@ -44,7 +44,35 @@ $(document).ready(function() {
     equal(Data.get(data, 'a.b.z'), null, 'null returned for non existing index')
     Data.set(false, data, ['a', 'b'], null)
     ok(!Data.get(data, 'a').hasOwnProperty('b'), 'set null removes the index')
-  });
+  })
+
+  test('match data', 18, function() {
+    var func = function() {}
+      , sub  = { w: { a: 1, b: 2 }, x: true, y: false, z: func }
+      , root = { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false }
+    ok (Skin.Data.match(root, { a: 1 }), 'simple match')
+    ok (!Skin.Data.match(root, { a: 2 }), 'simple mismatch')
+
+    ok (Skin.Data.match(root, { a: 1, b: 2 }), 'all match for any conditions')
+    ok (Skin.Data.match(root, { a: 1, b: 1, s: 3, e: false }), 'any match for any conditions')
+    ok (!Skin.Data.match(root, { a: 0, b: 1, s: 3, e: false }), 'all mismatch for any conditions')
+
+    ok (Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}}, false), 'all match for all conditions')
+    ok (!Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bax', a: { b: 1 }}}, false), 'any mismatch for all conditions')
+    ok (!Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 1, c: true }}}, false), 'extra key, value mismatch for all conditions')
+    ok (Skin.Data.match(root, { a: 1, b: 2, e: sub }, root, false), 'referenced match for all conditions')
+
+    ok (Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: { w: { a: 1, b: 2 }, x: true, y: false, z: func }, f: false }, true), 'all match for exact method')
+    ok (Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false }, true), 'referenced match for exact method')
+    ok (!Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false }, true), 'any mismatch for exact method')
+    ok (!Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, e: sub, f: false }, true), 'missing key, value mismatch for exact method')
+    ok (!Skin.Data.match(root, { a: 1, b: 2, c: { foo: 'bar', a: { b: 2 }}, d: true, e: sub, f: false, g: { foo: 'bar' }}, true), 'extra key, value mismatch for exact method')
+
+    ok (Skin.Data.match(root, { a: 1, b: '*' }, false), 'wild card match for all conditions')
+    ok (!Skin.Data.match(root, { a: 1, g: '*' }, false), 'wild card mismatch for all conditions')
+    ok (Skin.Data.match(root, { a: 1, b: function(value) { return value == 2 }}, false), 'filter function match for all conditions')
+    ok (!Skin.Data.match(root, { a: 1, b: function(value) { return value == 3 }}, false), 'filter function mismatch for all conditions')
+  })
 
   test('find data', 7, function() {
     var root = { a: 1000, z: 0 }
@@ -60,6 +88,22 @@ $(document).ready(function() {
 
     equal(Data.find(root, 'z-a', { foo: 'bar' }, true).length, 2, 'found recursively, using pointer, string index and condition')
     equal(Data.find(root, { b: '*' }, true).length, 2, 'found recursively, using pointer and wild card condition')
-  });
+  })
+
+  test('filter data', 2, function() {
+    var test = { message: 'hi!' }
+      , data = [{ a: 1, b: 2 }, { a: 2, b: { c: 3 }}, { b: 5 }, test, { foo: 'bar' }]
+      , result
+    result = Data.filter(data, { message: 'hi!' })
+    equal(result[0], test, 'filtered objects by simple condition')
+    console.log(result);
+
+    var test = { message: 'hi!' }
+      , data = [{ a: 1, b: 2 }, { a: 2, b: { c: 3 }}, { b: 5 }, test, { foo: 'bar' }]
+      , result
+    result = Data.filter(data, { b: function(value) { return value > 4 }})
+    equal(result.length, 1, 'filtered objects by filter function')
+    console.log(result);
+  })
 
 });
