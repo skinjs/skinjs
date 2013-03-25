@@ -26,17 +26,18 @@
   function isNode(symbol)      { return symbol != null && symbol.nodeType }
 
   // key strings
-  var UID       = 'uid'
-    , CALLBACKS = 'callbacks'
-    , PUBLISHER = 'publisher'
-    , ALIAS     = 'alias'
-    , SETTINGS  = 'settings'
-    , NODES     = 'nodes'
-    , BASE      = 'base'
-    , PLUGIN    = 'plugin'
-    , REQUIRE   = 'require'
-    , PRELOAD   = 'preload'
-    , PACK      = 'pack';
+  var UID       = 'uid'         // used in skin uid
+    , CALLBACKS = 'callbacks'   // used in hub subscribe, unsubscribe, publish
+    , PUBLISHER = 'publisher'   // used in hub subscribe, unsubscribe, publish
+    , POINTER   = 'pointer'     // used in data find results
+    , INDEX     = 'index'       // used in data find results
+    , ALIAS     = 'alias'       // used in skin uid
+    , BASE      = 'base'        // used in data get, set, settings
+    , SETTINGS  = 'settings'    // used in settings
+    , PLUGIN    = 'plugin'      // used in settings
+    , REQUIRE   = 'require'     // used in settings
+    , PRELOAD   = 'preload'     // used in settings
+    , PACK      = 'pack';       // used in settings
 
 
 
@@ -183,6 +184,7 @@
           var publisherUid = uid(publisher)
             , callbacks    = subscriptions.get(subscription, message, CALLBACKS)
             , count;
+            // TODO: find all callbacks in sub branches
           for (count in recipients) {
             try {
               recipients[count].callback(message, data);
@@ -336,30 +338,40 @@
   }
 
   // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
-  // and return array of keys of containing children
-  // first optional arguments can be sub branch pointer, index, just like get() method
+  // and returns array of { pointer: pointer, index: index } of containing children
+  // first optional arguments can be sanitize, pointer, index, will be passed to get() method
   // followed by the condition object { key: value }
-  // last boolean argument indicates if we should search recursively, default is false
-  // example: data.find(pointer, index, { key: 'value' }, true);
+  // last boolean argument indicates if we should search children recursively, default is false
+  // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
   Datas.find = function() {
-    var that     = this
-      , args     = slice.call(arguments, 0)
-      , result   = []
-      , pointer, condition, recursive, key;
+    var args     = slice.call(arguments, 0)
+      , results  = []
+      , pointer, index, key, childKey, result, condition, recursive;
+    // recursive should be the last argument, if its boolean
     recursive = args.slice(-1)[0];
-    if (isBoolean(recursive)) {
+    if (isBoolean(args.slice(-1)[0])) {
       args = args.slice(0, -1);
     } else recursive = false;
+    // then the condition
     condition = args.slice(-1)[0];
     args = args.slice(0, -1);
-    pointer = (args.length == 1)? args[0] : that.get.apply(that, args);
-    for (key in pointer) {
-      // searching in direct children
-      if (Data.match(condition, pointer[key])) result.push(key);
-      // search recursively in deeper levels
-      // TODO: implement this
+    // remainings can be passed to get()
+    pointer = this.get.apply(this, args);
+    if (isObject(pointer)) for (key in pointer) this.look(results, [key], pointer[key], condition, recursive);
+    return results;
+  }
+
+  // used by find() method
+  // results is an array passed by reference
+  Datas.look = function(results, index, pointer, condition, recursive) {
+    var result, key;
+    if (Data.match(condition, pointer)) {
+      result = {};
+      result[POINTER] = pointer;
+      result[INDEX]   = index;
+      results.push(result);
     }
-    return result;
+    if (recursive && isObject(pointer)) for (key in pointer) this.look(results, index.concat([key]), pointer[key], condition, recursive);
   }
 
   // Data static methods and properties
@@ -399,9 +411,10 @@
         // recursive match for arrays and objects
         else if ((isObject(condition[key]) || isArray(condition[key]))
              && (Data.match(condition[key], object[key], method))) matched = true;
-        // filter function
-        else if ((isFunction(condition[key]))
-             && (condition[key](object[key]))) matched = true;
+        // filter function, only if object[key] is not a function itself
+        // if it is, we simply compare two functions
+        else if (isFunction(condition[key]) && !isFunction(object[key])
+             && condition[key](object[key])) matched = true;
         // simple compare
         else if (condition[key] == object[key]) matched = true;
         // if method is any and we have a match
