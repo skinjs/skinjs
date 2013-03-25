@@ -37,7 +37,7 @@
     , PLUGIN    = 'plugin'      // used in settings
     , REQUIRE   = 'require'     // used in settings
     , PRELOAD   = 'preload'     // used in settings
-    , PACK      = 'pack';       // used in settings
+    , PACK      = 'pack'        // used in settings
 
 
 
@@ -48,24 +48,23 @@
 
     // Skin private methods and properties
     // -----------------------------------
-    var that     = this
-      , data     = new Data()
-      , settings = {};
+    var that = this
+      , data = {}
     // default settings
-    settings[BASE] = Skin.defaults;
-    data.set(SETTINGS, settings);
+    data[SETTINGS] = {}
+    data[SETTINGS][BASE] = Skin.defaults
     // parse options
-    configure(options);
+    configure(options)
     // load modules which should be preloaded
-    fetch(data.get(SETTINGS, PRELOAD));
+    fetch(Data.get(false, data, [SETTINGS, PRELOAD]))
 
     // merge in new options and perform necessary actions
     function configure(options) {
       // merge in new options
-      if (options) data.set(SETTINGS, options);
+      if (options) Data.set(false, data, [SETTINGS], options)
       // assign to instance
-      that.require = data.get(SETTINGS, REQUIRE);
-      that.plugin  = data.get(SETTINGS, PLUGIN);
+      that.require = Data.get(false, data, [SETTINGS, REQUIRE])
+      that.plugin  = Data.get(false, data, [SETTINGS, PLUGIN])
     }
 
     // fetch modules, and handle the return value
@@ -74,11 +73,11 @@
     function fetch(modules) {
       var count, module;
       if (!isArray(modules)) modules = slice.call(arguments, 0);
-      require(data.get(SETTINGS, PACK), modules, function() {
+      require(Data.get(false, data, [SETTINGS, PACK]), modules, function() {
         for (count in arguments) {
           module = arguments[count];
           if (isFunction(module)) module.call(that);
-          else if (isObject(module)) data.set(module);
+          else if (isObject(module)) Data.set(data, module);
         }
       })
     }
@@ -122,7 +121,7 @@
 
   // create unique id for everything
   // zero is reserved for null
-  var token = Skin.token = -1
+  var token = Skin.token = 0
     , uid = Skin.uid = function(symbol) {
       if (symbol == null) return '0';
       // TODO: stored uid on dom elements should be removed at some point
@@ -142,7 +141,7 @@
 
       // Hub private methods and properties
       // ----------------------------------
-      var subscriptions = new Data();
+      var subscriptions = {};
 
       return {
 
@@ -151,9 +150,9 @@
         subscribe: function(publisher, message, callback) {
           var publisherUid = uid(publisher), callbacks;
           // create a node for publisher if it doesn't exist
-          subscriptions.get(publisherUid) || subscriptions.set(publisherUid, PUBLISHER, publisher);
+          Data.get(subscriptions, publisherUid) || Data.set(subscriptions, publisherUid, PUBLISHER, publisher);
           // get or create callbacks with the message path as index
-          callbacks = subscriptions.get(publisherUid, message, CALLBACKS) || subscriptions.set(publisherUid, message, CALLBACKS, []);
+          callbacks = Data.get(subscriptions, publisherUid, message, CALLBACKS) || Data.set(subscriptions, publisherUid, message, CALLBACKS, []);
           // add the callback
           callbacks.push(callback);
         }
@@ -184,7 +183,7 @@
             , subscribers, subscriber, callbacks, callback;
           // set condition and finding callbacks in sub branches
           condition[CALLBACKS] = '*';
-          subscribers = subscriptions.find(publisherUid, message, condition, true);
+          subscribers = Data.find(subscriptions, publisherUid, message, condition, true);
           // calling callbacks
           for (subscriber in subscribers) {
             callbacks = subscribers[subscriber][POINTER][CALLBACKS];
@@ -213,232 +212,221 @@
 
 
 
-  // Data class
-  // ==========
-  var Data = Skin.Data = function(data) {
+  // Data module
+  // ===========
+  var Data = Skin.Data = (function() {
 
     // Data private methods and properties
     // -----------------------------------
-    this.data = data || {};
-  }
-  var Datas = Data.prototype;
+    // sanitize mixed index
+    // example: data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
+    // TODO: optimize this, unnecessary complication
+    var splitter = /[\s.-]/
+    function sanitize() {
+      var args = arguments, index = [], count;
+      for (count in args)
+        index = (isString(args[count]))? index.concat(args[count].split(splitter))
+              : (isArray(args[count]))? index.concat(sanitize.apply(this, args[count]))
+              : index;
+      return index;
+    }
 
-  // Data public methods
-  // -------------------
-  // get the pointer to an index path, related to the starting pointer
-  // index path can be an array, or string chunks sliced by . or -
-  // returns null if the path doesn't exist
-  // example: get(sanitize, pointer, index)
-  Datas.get = function() {
-    var args     = slice.call(arguments, 0)
-      , pointer  = this.data
-      , sanitize = true
-      , index, key, flag;
-    // we can disable sanitizing of index, when index is a valid array
-    // this can optimize speed for internal use
-    if (isBoolean(args[0])) {
-      sanitize = args[0];
-      args = args.slice(1);
+    // used by public find() method
+    // results is an array passed by reference
+    function look(results, index, pointer, condition, recursive) {
+      var result, key;
+      if (match(condition, pointer)) {
+        result = {};
+        result[POINTER] = pointer;
+        result[INDEX]   = index;
+        results.push(result);
+      }
+      if (recursive && isObject(pointer)) for (key in pointer) look(results, index.concat([key]), pointer[key], condition, recursive);
     }
-    // any object left at the beginning of arguments should be the pointer
-    if (isObject(args[0])) {
-      pointer = args[0];
-      args = args.slice(1);
+
+    // check if object meets a condition, methods can be any, all and exact
+    // method undefined (default) means if any of the conditions matched return true
+    // method false, means all of the conditions should match
+    // method true, means exact match, hence two given objects should contain exactly the same content tree
+    // example: Data.match({ foo: 'bar', boo: someObject }, anotherObject, false);
+    // TODO: implement BASE and MAP
+    function match(condition, object, method) {
+      // speed check
+      if (condition === object) return true;
+      var key, matched;
+      // simple check if all keys exist for exact or all matching methods
+      // before going into costly recursive matching
+      if (isBoolean(method)) for (key in condition) if (isUndefined(object[key])) return false;
+
+      // now go through every key
+      for (key in condition) {
+        matched = false;
+        if (condition[key]) {
+          // wild card, any value
+          if (condition[key] == '*' && has.call(object, key)) matched = true;
+          // recursive match for arrays and objects
+          else if ((isObject(condition[key]) || isArray(condition[key]))
+               && (Data.match(condition[key], object[key], method))) matched = true;
+          // filter function, only if object[key] is not a function itself
+          // if it is, we simply compare two functions
+          else if (isFunction(condition[key]) && !isFunction(object[key])
+               && condition[key](object[key])) matched = true;
+          // simple compare
+          else if (condition[key] == object[key]) matched = true;
+          // if method is any and we have a match
+          // or method is all or exact and we don't have a match
+          // no need to continue the loop
+          if (matched && isUndefined(method)) return true;
+          if (!matched && isBoolean(method)) return false;
+        } else {
+          // if method is exact and object has a key condition doesn't
+          if (method == true && object[key]) return false;
+        }
+      }
+
+      // inverse check, in exact match all target keys should have been covered
+      if (method == true) for (key in object) if (isUndefined(condition[key])) return false;
+      if (isUndefined(method)) return matched;
+      else return true;
     }
-    if (!sanitize) index = args[0];
-    else if (args.length) index = Data.sanitize(args);
-    else return pointer;
-    while (index.length) {
-      key = index.shift();
-      flag = false;
-      if (has.call(pointer, key)) {
-        pointer = pointer[key];
-        flag = true;
-      } else {
-        // check for value in base
-        // TODO: implement MAP
-        while (isObject(pointer[BASE])) {
-          pointer = pointer[BASE];
+
+    return {
+
+      // Data public methods
+      // -------------------
+      // get the pointer to an index path, related to the starting pointer
+      // index path can be an array, or string chunks sliced by . or -
+      // returns null if the path doesn't exist
+      // example: get(sanitizing, pointer, index)
+      get: function() {
+        var args       = slice.call(arguments, 0)
+          , sanitizing = true
+          , pointer, index, key, flag;
+        // we can disable sanitizing of index, when index is a valid array
+        // this can optimize speed for internal use
+        if (isBoolean(args[0])) {
+          sanitizing = args[0];
+          args = args.slice(1);
+        }
+        // any object left at the beginning of arguments should be the pointer
+        pointer = args[0];
+        args = args.slice(1);
+        if (!sanitizing) index = args[0];
+        else if (args.length) index = sanitize(args);
+        else return pointer;
+        while (index.length) {
+          key = index.shift();
+          flag = false;
           if (has.call(pointer, key)) {
             pointer = pointer[key];
             flag = true;
-            break;
+          } else {
+            // check for value in base
+            // TODO: implement MAP
+            while (isObject(pointer[BASE])) {
+              pointer = pointer[BASE];
+              if (has.call(pointer, key)) {
+                pointer = pointer[key];
+                flag = true;
+                break;
+              }
+            }
           }
         }
+        return (flag)? pointer : null;
       }
-    }
-    return (flag)? pointer : null;
-  }
 
-  // set value for an index path, related to the starting pointer
-  // index path can be an array, or string chunks sliced by . or -
-  // returns pointer to the last modified object or array
-  // example: set(sanitize, pointer, index, value)
-  Datas.set = function() {
-    var args     = slice.call(arguments, 0)
-      , pointer  = this.data
-      , sanitize = true
-      , index, key, value;
-    // last argument is always the value
-    value = args.slice(-1)[0];
-    args = args.slice(0, -1);
-    if (args.length) {
-      // we can disable sanitizing of index, when index is a valid array
-      // this can optimize speed for internal use
-      if (isBoolean(args[0])) {
-        sanitize = args[0];
-        args = args.slice(1);
-      }
-      // any object left at the beginning of arguments should be the pointer
-      if (isObject(args[0])) {
+      // set value for an index path, related to the starting pointer
+      // index path can be an array, or string chunks sliced by . or -
+      // returns pointer to the last modified object or array
+      // example: set(sanitizing, pointer, index, value)
+    , set: function() {
+        var args       = slice.call(arguments, 0)
+          , sanitizing = true
+          , pointer, index, key, value;
+        // last argument is always the value
+        value = args.slice(-1)[0];
+        args = args.slice(0, -1);
+        // we can disable sanitizing of index, when index is a valid array
+        // this can optimize speed for internal use
+        if (isBoolean(args[0])) {
+          sanitizing = args[0];
+          args = args.slice(1);
+        }
+        // any object left at the beginning of arguments should be the pointer
         pointer = args[0];
         args = args.slice(1);
-      }
-      if (!sanitize) index = args[0];
-      else index = Data.sanitize(args);
-    } else {
-      // if value is a single string and there's no pointer or index
-      // we parse the string for special cases
-      index = [];
-      if (isString(value)) {
-        if (Data.splitter.test(value)) {
-          // TODO: parse strings for some magic!
-        } else {
-          // only a single key has been passed in, no other arguments
-          // create an empty object for that key if it doesn't exist
-          pointer = pointer[value] || (pointer[value] = {});
+        if (!sanitizing) index = args[0];
+        else if (args.length) index = sanitize(args);
+        else index = [];
+        if (!index.length) {
+          // if value is a single string and there's no pointer or index
+          // we parse the string for special cases
+          if (isString(value)) {
+            if (splitter.test(value)) {
+              // TODO: parse strings for some magic!
+            } else {
+              // only a single key has been passed in, no other arguments
+              // create an empty object for that key if it doesn't exist
+              pointer = pointer[value] || (pointer[value] = {});
+            }
+          } else if (isObject(value)) for (key in value) this.set(false, pointer, [key], value[key]);
+          // handle an empty index with an object as value
+          // the value can't be assigned to the pointer directly
+          // hence, if the value isn't an object we just ignore it
+          // if the value is an object, we call set for each of its keys
+        } else while (index.length) {
+          key = index.shift();
+          if (index.length) {
+            // there are stil deeper levels
+            if (!has.call(pointer, key) || !isObject(pointer[key])) {
+              // isObject() returns false for arrays
+              // otherwise the next level object could be pushed in the existing array
+              pointer[key] = {};
+            }
+            pointer = pointer[key];
+          } else {
+            // no more levels, last key
+            // if value is null, we remove the key by convension
+            // no one wants a key pointing to null!
+            if (value == null) delete pointer[key];
+            else if (key != BASE && isObject(value) && isObject(pointer[key])) {
+              // merge two objects, if the value isn't the base reference
+              pointer = pointer[key];
+              for (key in value) this.set(false, pointer, [key], value[key]);
+            }
+            // replace or create the value
+            else pointer = pointer[key] = value;
+          }
         }
+        return pointer;
+      }
+
+      // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
+      // and returns array of { pointer: pointer, index: index } of containing children
+      // first optional arguments can be sanitize, pointer, index, will be passed to get() method
+      // followed by the condition object { key: value }
+      // last boolean argument indicates if we should search children recursively, default is false
+      // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
+    , find: function() {
+        var args     = slice.call(arguments, 0)
+          , results  = []
+          , pointer, index, key, childKey, result, condition, recursive;
+        // recursive should be the last argument, if its boolean
+        recursive = args.slice(-1)[0];
+        if (isBoolean(recursive)) {
+          args = args.slice(0, -1);
+        } else recursive = false;
+        // then the condition
+        condition = args.slice(-1)[0];
+        args = args.slice(0, -1);
+        // remainings can be passed to get()
+        pointer = this.get.apply(this, args);
+        if (isObject(pointer)) for (key in pointer) look(results, [key], pointer[key], condition, recursive);
+        return results;
       }
     }
-    // handle an empty index with an object as value
-    // the value can't be assigned to the pointer directly
-    // hence, if the value isn't an object we just ignore it
-    // if the value is an object, we call set for each of its keys
-    if (!index.length && isObject(value)) for (key in value) this.set(false, pointer, [key], value[key]);
-    else while (index.length) {
-      key = index.shift();
-      if (index.length) {
-        // there are stil deeper levels
-        if (!has.call(pointer, key) || !isObject(pointer[key])) {
-          // isObject() returns false for arrays
-          // otherwise the next level object could be pushed in the existing array
-          pointer[key] = {};
-        }
-        pointer = pointer[key];
-      } else {
-        // no more levels, last key
-        // if value is null, we remove the key by convension
-        // no one wants a key pointing to null!
-        if (value == null) delete pointer[key];
-        else if (key != BASE && isObject(value) && isObject(pointer[key])) {
-          // merge two objects, if the value isn't the base reference
-          pointer = pointer[key];
-          for (key in value) this.set(false, pointer, [key], value[key]);
-        }
-        // replace or create the value
-        else pointer = pointer[key] = value;
-      }
-    }
-    return pointer;
-  }
-
-  // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
-  // and returns array of { pointer: pointer, index: index } of containing children
-  // first optional arguments can be sanitize, pointer, index, will be passed to get() method
-  // followed by the condition object { key: value }
-  // last boolean argument indicates if we should search children recursively, default is false
-  // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
-  Datas.find = function() {
-    var args     = slice.call(arguments, 0)
-      , results  = []
-      , pointer, index, key, childKey, result, condition, recursive;
-    // recursive should be the last argument, if its boolean
-    recursive = args.slice(-1)[0];
-    if (isBoolean(recursive)) {
-      args = args.slice(0, -1);
-    } else recursive = false;
-    // then the condition
-    condition = args.slice(-1)[0];
-    args = args.slice(0, -1);
-    // remainings can be passed to get()
-    pointer = this.get.apply(this, args);
-    if (isObject(pointer)) for (key in pointer) Data.look(results, [key], pointer[key], condition, recursive);
-    return results;
-  }
-
-  // Data static methods and properties
-  // ----------------------------------
-  // sanitize mixed index
-  // example: data.get('a', 'b.c', ['d.x', 'e-z'], 'f');
-  // TODO: optimize this, unnecessary complication
-  Data.splitter = /[\s.-]/;
-  Data.sanitize = function() {
-    var args = arguments, index = [], count;
-    for (count in args)
-      index = (isString(args[count]))? index.concat(args[count].split(Data.splitter))
-            : (isArray(args[count]))? index.concat(Data.sanitize.apply(this, args[count]))
-            : index;
-    return index;
-  }
-
-  // used by find() method
-  // results is an array passed by reference
-  Data.look = function(results, index, pointer, condition, recursive) {
-    var result, key;
-    if (Data.match(condition, pointer)) {
-      result = {};
-      result[POINTER] = pointer;
-      result[INDEX]   = index;
-      results.push(result);
-    }
-    if (recursive && isObject(pointer)) for (key in pointer) Data.look(results, index.concat([key]), pointer[key], condition, recursive);
-  }
-
-  // check if object meets a condition, methods can be any, all and exact
-  // method undefined (default) means if any of the conditions matched return true
-  // method false, means all of the conditions should match
-  // method true, means exact match, hence two given objects should contain exactly the same content tree
-  // example: Data.match({ foo: 'bar', boo: someObject }, anotherObject, false);
-  // TODO: implement BASE and MAP
-  Data.match = function(condition, object, method) {
-    // speed check
-    if (condition === object) return true;
-    var key, matched;
-    // simple check if all keys exist for exact or all matching methods
-    // before going into costly recursive matching
-    if (isBoolean(method)) for (key in condition) if (isUndefined(object[key])) return false;
-
-    // now go through every key
-    for (key in condition) {
-      matched = false;
-      if (condition[key]) {
-        // wild card, any value
-        if (condition[key] == '*' && has.call(object, key)) matched = true;
-        // recursive match for arrays and objects
-        else if ((isObject(condition[key]) || isArray(condition[key]))
-             && (Data.match(condition[key], object[key], method))) matched = true;
-        // filter function, only if object[key] is not a function itself
-        // if it is, we simply compare two functions
-        else if (isFunction(condition[key]) && !isFunction(object[key])
-             && condition[key](object[key])) matched = true;
-        // simple compare
-        else if (condition[key] == object[key]) matched = true;
-        // if method is any and we have a match
-        // or method is all or exact and we don't have a match
-        // no need to continue the loop
-        if (matched && isUndefined(method)) return true;
-        if (!matched && isBoolean(method)) return false;
-      } else {
-        // if method is exact and object has a key condition doesn't
-        if (method == true && object[key]) return false;
-      }
-    }
-
-    // inverse check, in exact match all target keys should have been covered
-    if (method == true) for (key in object) if (isUndefined(condition[key])) return false;
-    if (isUndefined(method)) return matched;
-    else return true;
-  }
+  })();
 
 
 
