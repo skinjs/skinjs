@@ -163,7 +163,7 @@
         subscribe: function(publisher, message, callback) {
           var publisherUid = uid(publisher)
             , callbacks    = subscriptions.get(publisherUid, message, CALLBACKS) || subscriptions.set(publisherUid, message, CALLBACKS, []);
-          if (!callbacks.indexOf(callback)) callbacks.push(callback);
+          callbacks.push(callback);
         }
 
       , unsubscribe: function(publisher, message, callback) {
@@ -180,16 +180,20 @@
           return false;
         }
 
-      , publish: function(publisher, message) {
+      , publish: function(publisher, message, data) {
           var publisherUid = uid(publisher)
-            , callbacks    = subscriptions.get(subscription, message, CALLBACKS)
-            , count;
-            // TODO: find all callbacks in sub branches
-          for (count in recipients) {
-            try {
-              recipients[count].callback(message, data);
-            } catch(exception) {
-              throw exception;
+            , condition    = {}
+            , subscribers, subscriber, callbacks, callback;
+          condition[CALLBACKS] = '*';
+          subscribers = subscriptions.find(publisherUid, message, condition, true);
+          for (subscriber in subscribers) {
+            callbacks = subscribers[subscriber][POINTER][CALLBACKS];
+            for (callback in callbacks) {
+              try {
+                callbacks[callback](data);
+              } catch(exception) {
+                throw exception;
+              }
             }
           }
         }
