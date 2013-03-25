@@ -357,21 +357,8 @@
     args = args.slice(0, -1);
     // remainings can be passed to get()
     pointer = this.get.apply(this, args);
-    if (isObject(pointer)) for (key in pointer) this.look(results, [key], pointer[key], condition, recursive);
+    if (isObject(pointer)) for (key in pointer) Data.look(results, [key], pointer[key], condition, recursive);
     return results;
-  }
-
-  // used by find() method
-  // results is an array passed by reference
-  Datas.look = function(results, index, pointer, condition, recursive) {
-    var result, key;
-    if (Data.match(condition, pointer)) {
-      result = {};
-      result[POINTER] = pointer;
-      result[INDEX]   = index;
-      results.push(result);
-    }
-    if (recursive && isObject(pointer)) for (key in pointer) this.look(results, index.concat([key]), pointer[key], condition, recursive);
   }
 
   // Data static methods and properties
@@ -386,6 +373,19 @@
             : (isArray(args[count]))? index.concat(Data.sanitize.apply(this, args[count]))
             : index;
     return index;
+  }
+
+  // used by find() method
+  // results is an array passed by reference
+  Data.look = function(results, index, pointer, condition, recursive) {
+    var result, key;
+    if (Data.match(condition, pointer)) {
+      result = {};
+      result[POINTER] = pointer;
+      result[INDEX]   = index;
+      results.push(result);
+    }
+    if (recursive && isObject(pointer)) for (key in pointer) Data.look(results, index.concat([key]), pointer[key], condition, recursive);
   }
 
   // check if object meets a condition, methods can be any, all and exact
