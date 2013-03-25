@@ -142,20 +142,6 @@
       // ----------------------------------
       var subscriptions = new Data();
 
-      // find and return an array of all existing subscribers for a message
-      // messages are string chunks sliced by . representing a hierarchy
-      function subscribers(message) {
-        if (!isString(message)) return [];
-        var subscribers = subscriptions[message] || []
-          , index       = message.lastIndexOf('.');
-        while (index !== -1) {
-          message = message.substr(0, index);
-          if (subscriptions[message]) subscribers.concat(subscriptions[message]);
-          index = message.lastIndexOf('.');
-        }
-        return subscribers;
-      }
-
       return {
 
         // Hub public methods
@@ -190,6 +176,7 @@
             callbacks = subscribers[subscriber][POINTER][CALLBACKS];
             for (callback in callbacks) {
               try {
+                // TODO: if a callback returns false break the chain
                 callbacks[callback](data);
               } catch(exception) {
                 throw exception;
