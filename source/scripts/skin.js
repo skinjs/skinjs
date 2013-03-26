@@ -234,7 +234,6 @@
     // Data private methods and properties
     // -----------------------------------
     // sanitize index, convert multi arguments or chunked string to array
-    // TODO: optimize this, unnecessary complication
     var splitter = /[\s.-]/
     function sanitize() {
       var args = arguments, index = [], count;
