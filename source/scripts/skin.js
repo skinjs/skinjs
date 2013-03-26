@@ -125,10 +125,10 @@
   }
 
   // create unique id for everything
-  // zero is reserved for null
+  // zero is reserved for null or undefined
   var token = Skin.token = 0
     , uid = Skin.uid = function(symbol) {
-      if (symbol == null) return '0';
+      if (!symbol) return '0';
       // TODO: stored uid on dom elements should be removed at some point
       if (isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++Skin.token);
       return ((isString(symbol))? symbol : '') + ++Skin.token;
@@ -168,22 +168,27 @@
             , condition   = {}
             , subscribers = subscriptions
             , publisher, message, callback
-
           if (isObject(args[0])) {
             publisher = args[0];
             args = args.slice(1);
-            subscribers = subscriptions[uid(publisher)] || {}
           }
+          subscribers = subscriptions[uid(publisher)];
+          // found a publisher branch
+          // subscribers is a data node
           if (isString(args[0])) {
             message = args[0];
             args = args.slice(1);
-            condition[CALLBACKS] = '*';
-            subscribers = Data.find(subscribers, message, condition);
           }
+          condition[CALLBACKS] = '*';
+          subscribers = Data.find(subscribers, message, condition);
+          // found all the sub nodes which have callbacks, based on message path
+          // subscribers is an array now
           if (isFunction(args[0])) {
             callback = args[0];
-            args = args.slice(1);
+            condition[CALLBACKS] = callback;
           }
+          subscribers = Data.filter(subscribers, condition);
+          // TODO: remove nodes if callbacks are empty
         }
 
       , publish: function(publisher, message, data) {
@@ -191,8 +196,9 @@
             , condition    = {}
             , subscribers, subscriber, callbacks, callback;
           // set condition and finding callbacks in sub branches
+          subscribers = subscriptions[uid(publisher)];
           condition[CALLBACKS] = '*';
-          subscribers = Data.find(subscriptions, publisherUid, message, condition, true);
+          subscribers = Data.find(subscribers, message, condition, true);
           // calling callbacks
           for (subscriber in subscribers) {
             callbacks = subscribers[subscriber][CALLBACKS];
@@ -358,10 +364,10 @@
       // last boolean argument indicates if we should search children recursively, default is false
       // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
     , find: function() {
-        var that    = this
-          , args    = slice.call(arguments, 0)
-          , results = []
-          , pointer, key, result, condition, recursive;
+        var that       = this
+          , args       = slice.call(arguments, 0)
+          , collection = []
+          , pointer, key, condition, recursive;
         // recursive should be the last argument, if its boolean
         recursive = args.slice(-1)[0];
         if (isBoolean(recursive)) {
@@ -373,12 +379,12 @@
         // remainings can be passed to get()
         pointer = this.get.apply(this, args);
         // recursive part, results is passed by reference
-        var pick = function(results, pointer, condition, recursive) {
-          if (that.match(pointer, condition)) results.push(pointer);
-          if (recursive && isObject(pointer)) for (key in pointer) pick(results, pointer[key], condition, recursive);
+        var pick = function(collection, pointer, condition, recursive) {
+          if (that.match(pointer, condition)) collection.push(pointer);
+          if (recursive && isObject(pointer)) for (key in pointer) pick(collection, pointer[key], condition, recursive);
         }
-        if (isObject(pointer)) for (key in pointer) pick(results, pointer[key], condition, recursive);
-        return results;
+        if (isObject(pointer)) pick(collection, pointer, condition, recursive);
+        return collection;
       }
 
       // filter an array of objects, keep those which match a condition
