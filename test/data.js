@@ -4,7 +4,7 @@ $(document).ready(function() {
 
   var Data = Skin.Data
 
-  test('access data', 10, function() {
+  test('access data', 9, function() {
     var data = { foo: { bar: 'baz' }}
 
     equal(Data.get(data.foo, 'bar'), 'baz', 'get data by pointer and string index')
@@ -20,16 +20,13 @@ $(document).ready(function() {
     Data.set(data, 'a.b.c', { d: { e: 'f' }});
     equal(Data.get(data, 'a-b-c-d-e'), 'f', 'get and set data by pointer and string index')
 
-    Data.set(data.foo, ['z', ['y.x', 'w'], 'v'], { t: 's' });
-    equal(Data.get(data, 'foo z y x', 'w', ['v.t']), 's', 'get and set data by mixed index')
-
     Data.set(data, 'newData');
     ok(Data.get(data, 'newData') instanceof Object, 'new empty data object was set under root')
 
     var someData  = { foo: 'barrr', boo: 'bazzz' }
       , otherData = { someData: someData }
     Data.set(data, 'someKey', 'someOtherKey', otherData)
-    equal(Data.get(data, 'someKey.someOtherKey', 'someData.foo'), 'barrr', 'mixed access')
+    equal(Data.get(data, 'someKey', 'someOtherKey', 'someData', 'foo'), 'barrr', 'mixed access')
 
     var basedData = { base: someData }
     Data.set(data, 'myBasedData', basedData)
@@ -42,7 +39,7 @@ $(document).ready(function() {
     var data = {}
     Data.set(data, 'a.b.c', { d: { e: 'f' }})
     equal(Data.get(data, 'a.b.z'), null, 'null returned for non existing index')
-    Data.set(false, data, ['a', 'b'], null)
+    Data.set(data, ['a', 'b'], null)
     ok(!Data.get(data, 'a').hasOwnProperty('b'), 'set null removes the index')
   })
 
@@ -79,8 +76,8 @@ $(document).ready(function() {
       , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
 
     Data.set(root, 'z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}})
-    equal(Data.find(root.z, 'a.p', 'good', { message: 'hello' })[0], sub.good, 'found the index of containing object, using pointer, string index and condition')
-    equal(Data.find(false, root.z, ['a', 'p', 'bad'], { message: 'goodbye' })[0], sub.bad, 'found the index of containing object, using pointer, array index and condition')
+    ok(Data.find(root.z, 'a.p.good', { message: 'hello' })[0] === sub.good, 'found the index of containing object, using pointer, string index and condition')
+    ok(Data.find(root.z, ['a', 'p', 'bad'], { message: 'goodbye' })[0] === sub.bad, 'found the index of containing object, using pointer, array index and condition')
     
     equal(Data.find(root, 'z-a', { b: 1 }).length, 1, 'found, using pointer, string index and condition')
     equal(Data.find(root, 'z-a', { b: 2 }).length, 0, 'not found, using pointer, string index and condition')

@@ -34,10 +34,9 @@
   var UID       = 'uid'         // used in skin uid
     , CALLBACKS = 'callbacks'   // used in hub subscribe, unsubscribe, publish
     , PUBLISHER = 'publisher'   // used in hub subscribe, unsubscribe, publish
-    , POINTER   = 'pointer'     // used in data find results
-    , INDEX     = 'index'       // used in data find results
-    , ALIAS     = 'alias'       // used in skin uid
     , BASE      = 'base'        // used in data get, set, settings
+    , PARENT    = 'parent'      // used in data
+    , ALIAS     = 'alias'       // used in settings
     , SETTINGS  = 'settings'    // used in settings
     , PLUGIN    = 'plugin'      // used in settings
     , REQUIRE   = 'require'     // used in settings
@@ -61,15 +60,15 @@
     // parse options
     configure(options)
     // load modules which should be preloaded
-    fetch(Data.get(false, data, [SETTINGS, PRELOAD]))
+    fetch(Data.get(data, [SETTINGS, PRELOAD]))
 
     // merge in new options and perform necessary actions
     function configure(options) {
       // merge in new options
-      if (options) Data.set(false, data, [SETTINGS], options)
+      if (options) Data.set(data, [SETTINGS], options)
       // assign to instance
-      that.require = Data.get(false, data, [SETTINGS, REQUIRE])
-      that.plugin  = Data.get(false, data, [SETTINGS, PLUGIN])
+      that.require = Data.get(data, [SETTINGS, REQUIRE])
+      that.plugin  = Data.get(data, [SETTINGS, PLUGIN])
     }
 
     // fetch modules, and handle the return value
@@ -78,7 +77,7 @@
     function fetch(modules) {
       var count, module;
       if (!isArray(modules)) modules = slice.call(arguments, 0);
-      require(Data.get(false, data, [SETTINGS, PACK]), modules, function() {
+      require(Data.get(data, [SETTINGS, PACK]), modules, function() {
         for (count in arguments) {
           module = arguments[count];
           if (isFunction(module)) module.call(that);
@@ -141,64 +140,58 @@
   // =========
   var Hub = Skin.Hub = (function() {
     // singleton instance
-    var instance;
+    var instance
     function initialize() {
 
       // Hub private methods and properties
       // ----------------------------------
-      var subscriptions = {};
+      var subscriptions = {}
 
       return {
 
         // Hub public methods
         // ------------------
         subscribe: function(publisher, message, callback) {
-          var publisherUid = uid(publisher), callbacks;
-          // create a node for publisher if it doesn't exist
-          Data.get(subscriptions, publisherUid) || Data.set(subscriptions, publisherUid, PUBLISHER, publisher);
-          // get or create callbacks with the message path as index
-          callbacks = Data.get(subscriptions, publisherUid, message, CALLBACKS) || Data.set(subscriptions, publisherUid, message, CALLBACKS, []);
-          // add the callback
-          callbacks.push(callback);
+          var publisherUid = uid(publisher)
+            , subscription = subscriptions[publisherUid]     || (subscriptions[publisherUid] = {})
+            , subscriber   = Data.get(subscription, message) || Data.set(subscription, message, {})
+            , callbacks    = subscriber[CALLBACKS]           || (subscriber[CALLBACKS] = [])
+          if (callbacks.indexOf(callback) == -1) callbacks.push(callback);
         }
 
         // example: unsubscribe(publisher, message, callback)
       , unsubscribe: function() {
           var args        = slice.call(arguments, 0)
             , condition   = {}
-            , subscribers = subscriptions
+            , subscription, subscribers
             , publisher, message, callback
           if (isObject(args[0])) {
             publisher = args[0];
             args = args.slice(1);
           }
-          subscribers = subscriptions[uid(publisher)];
-          // found a publisher branch
-          // subscribers is a data node
+          subscription = subscriptions[uid(publisher)];
           if (isString(args[0])) {
             message = args[0];
             args = args.slice(1);
           }
           condition[CALLBACKS] = '*';
-          subscribers = Data.find(subscribers, message, condition);
-          // found all the sub nodes which have callbacks, based on message path
-          // subscribers is an array now
+          subscribers = Data.find(subscription, message, condition, true);
           if (isFunction(args[0])) {
             callback = args[0];
             condition[CALLBACKS] = callback;
           }
-          subscribers = Data.filter(subscribers, condition);
+          //subscribers = Data.filter(subscribers, condition);
           // TODO: remove nodes if callbacks are empty
         }
 
       , publish: function(publisher, message, data) {
           var publisherUid = uid(publisher)
+            , subscription = subscriptions[uid(publisher)]
             , condition    = {}
-            , subscribers, subscriber, callbacks, callback;
+            , subscribers, subscriber, callbacks, callback
           // set condition and finding callbacks in sub branches
-          subscribers = subscriptions[uid(publisher)];
           condition[CALLBACKS] = '*';
-          subscribers = Data.find(subscribers, message, condition, true);
+          subscribers = Data.find(subscription, message, condition, true);
           // calling callbacks
           for (subscriber in subscribers) {
             callbacks = subscribers[subscriber][CALLBACKS];
@@ -236,12 +229,8 @@
     // sanitize index, convert multi arguments or chunked string to array
     var splitter = /[\s.-]/
     function sanitize() {
-      var args = arguments, index = [], count;
-      for (count in args)
-        index = (isString(args[count]))? index.concat(args[count].split(splitter))
-              : (isArray(args[count]))? index.concat(sanitize.apply(this, args[count]))
-              : index;
-      return index;
+      var args  = arguments
+      return (isArray(args[0]))? args[0] : (args.length > 1)? slice.call(args, 0) : (isString(args[0]))? args[0].split(splitter) : []
     }
 
     return {
@@ -251,22 +240,13 @@
       // get the pointer to an index path, related to the starting pointer
       // index path can be an array, or string chunks sliced by . or -
       // returns null if the path doesn't exist
-      // example: get(sanitizing, pointer, index)
+      // example: get(pointer, index)
       get: function() {
-        var args       = slice.call(arguments, 0)
-          , sanitizing = true
+        var args = slice.call(arguments, 0)
           , pointer, index, key, flag;
-        // we can disable sanitizing of index, when index is a valid array
-        // this can optimize speed for internal use
-        if (isBoolean(args[0])) {
-          sanitizing = args[0];
-          args = args.slice(1);
-        }
-        // any object left at the beginning of arguments should be the pointer
         pointer = args[0];
         args = args.slice(1);
-        if (!sanitizing) index = args[0];
-        else if (args.length) index = sanitize(args);
+        if (args.length) index = sanitize.apply(this, args);
         else return pointer;
         while (index.length) {
           key = index.shift();
@@ -293,25 +273,21 @@
       // set value for an index path, related to the starting pointer
       // index path can be an array, or string chunks sliced by . or -
       // returns pointer to the last modified object or array
-      // example: set(sanitizing, pointer, index, value)
+      // example: set(metadata, pointer, index, value)
     , set: function() {
-        var args       = slice.call(arguments, 0)
-          , sanitizing = true
-          , pointer, index, key, value;
+        var args = slice.call(arguments, 0)
+          , pointer, index, key, value, metadata;
         // last argument is always the value
         value = args.slice(-1)[0];
         args = args.slice(0, -1);
-        // we can disable sanitizing of index, when index is a valid array
-        // this can optimize speed for internal use
-        if (isBoolean(args[0])) {
-          sanitizing = args[0];
-          args = args.slice(1);
-        }
+        // store metadata
+        metadata = args[0];
+        if (isBoolean(metadata)) args = args.slice(1);
+        else metadata = false;
         // any object left at the beginning of arguments should be the pointer
         pointer = args[0];
         args = args.slice(1);
-        if (!sanitizing) index = args[0];
-        else if (args.length) index = sanitize(args);
+        if (args.length) index = sanitize.apply(this, args);
         else index = [];
         if (!index.length) {
           // if value is a single string and there's no pointer or index
@@ -322,9 +298,11 @@
             } else {
               // only a single key has been passed in, no other arguments
               // create an empty object for that key if it doesn't exist
-              pointer = pointer[value] || (pointer[value] = {});
+              pointer[value] || (pointer[value] = {});
+              if (metadata) pointer[value][PARENT] = pointer; 
+              pointer = pointer[value];
             }
-          } else if (isObject(value)) for (key in value) this.set(false, pointer, [key], value[key]);
+          } else if (isObject(value)) for (key in value) this.set(metadata, pointer, [key], value[key]);
           // handle an empty index with an object as value
           // the value can't be assigned to the pointer directly
           // hence, if the value isn't an object we just ignore it
@@ -337,6 +315,7 @@
               // isObject() returns false for arrays
               // otherwise the next level object could be pushed in the existing array
               pointer[key] = {};
+              if (metadata) pointer[key][PARENT] = pointer;
             }
             pointer = pointer[key];
           } else {
@@ -345,23 +324,28 @@
             // no one wants a key pointing to null!
             if (value == null) delete pointer[key];
             else if (key != BASE && isObject(value) && isObject(pointer[key])) {
-              // merge two objects, if the value isn't the base reference
+              if (metadata) pointer[key][PARENT] = pointer;
               pointer = pointer[key];
-              for (key in value) this.set(false, pointer, [key], value[key]);
+              for (key in value) this.set(metadata, pointer, [key], value[key]);
+            } else {
+              // replace or create the value
+              pointer = pointer[key] = value;
             }
-            // replace or create the value
-            else pointer = pointer[key] = value;
           }
         }
         return pointer;
       }
 
+    , indexify: function(pointer) {
+      
+      }
+
       // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
       // and returns array of pointers to containing children
-      // first arguments can be sanitize, pointer, index, will be passed to get() method
+      // first arguments are pointer and index, will be passed to get() method
       // followed by the condition object { key: value }
       // last boolean argument indicates if we should search children recursively, default is false
-      // example: data.find(sanitize, pointer, index, { key: 'value' }, recursive);
+      // example: data.find(pointer, index, { key: 'value' }, recursive);
     , find: function() {
         var that       = this
           , args       = slice.call(arguments, 0)
@@ -369,9 +353,8 @@
           , pointer, key, condition, recursive;
         // recursive should be the last argument, if its boolean
         recursive = args.slice(-1)[0];
-        if (isBoolean(recursive)) {
-          args = args.slice(0, -1);
-        } else recursive = false;
+        if (isBoolean(recursive)) args = args.slice(0, -1);
+        else recursive = false;
         // then the condition
         condition = args.slice(-1)[0];
         args = args.slice(0, -1);
