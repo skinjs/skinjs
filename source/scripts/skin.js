@@ -13,7 +13,7 @@
   // =====================================
   // shortcuts and references
   // existing skin is kept as oldSkin, to assign back in noConflict()
-  var _root = this, _oldSkin = _root.skin, _queue = [], _settings, _initialized, _hub, _require
+  var _root = this, _oldSkin = _root.skin, _queue = [], _settings, _initialized, _hub
 
   // helpers for local use
   // most likely the adapter has not been loaded yet, so we need these local helpers
@@ -42,31 +42,38 @@
     var count, length, succeed
     for (count = 0, length = _queue.length; count < length; count++) {
       succeed = true;
-      try { _queue[count][0].apply(_queue[count][2] || skin, _queue[count][1]) }
+      try { _queue[count][0].apply(_queue[count][2] || this, _queue[count][1]) }
       catch(exception) { succeed = false }
       finally { if (succeed) _queue = _queue.splice(count, 1) }
     }
   }
 
-  // merge in new options and perform necessary actions
-  function _configure(options) {
-    _extend(_settings, options);
-    // assign to local require
-    _require = _settings.require;
-  }
-
   // initialize skin
   function _initialize() {
+    _initialized = false;
     // TODO: implement jQuery, Zepto, Underscore and Backbone versions of adapter
     //       detect which library is available, then load a specific adapter
     //_extend(_settings.pack, { paths: { 'adapter': 'adapter.javascript' }});
-    _require(_settings.pack, ['hub'], function() {
+    _load(['hub'], function() {
       // assign hub
-      _hub = skin.Hub.getInstance();
+      //_hub = skin.Hub.getInstance();
       // dequeue, if there are standing requests
       _dequeue();
       // TODO: implement skin.ready() using events
       _initialized = true;
+    })
+  }
+
+  // load modules
+  function _load(modules, callback, args, context) {
+    var count, module
+    _settings.require(_settings.pack, modules, function() {
+      for (count in modules) {
+        module = modules[count];
+      //   if (isFunction(module)) module.call(that);
+      //   else if (isObject(module)) Data.set(data, module);
+      }
+      if (_isFunction(callback)) callback.apply(context || this, args);
     })
   }
 
@@ -77,7 +84,7 @@
   // ==============================
   // skin is intentionally not Capitalized
   var skin = _root.skin = function() {
-    var args = Array.prototype.slice.call(arguments), element, name, options
+    var args = Array.prototype.slice.call(arguments, 0), element, name, options
     // assign default settings
     _settings || (_settings = skin.defaults);
     // find out what are the arguments
@@ -86,11 +93,12 @@
     if (_isObject(args[0]))  { options = args[0] }
     // check if only options object is available, configure skin itself
     // this way we can configure string keys, require, preload and pack before anything is loaded
-    if (options && !element && !name) _configure(options);
+    if (options && !element && !name) _extend(_settings, options);
     // if skin hasn't been initialized yet, queue the request and initialize
     else if (!_initialized) {
       _enqueue(skin, args, this);
-      _initialize();
+      // ensure initialize function runs only once
+      if (_initialized == undefined) _initialize();
     } else {
       // get or create skin
     }
