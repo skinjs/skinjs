@@ -20,14 +20,21 @@ define('query', ['skin', 'adapter'], function(skin, adapter) {
 
   // Query Module
   // ============
-  // wraps data objects and adds cool functionality
+  // wraps data objects and adds some cool functionality
   var Query = skin.Query = function() {
     var args = adapter.arraySlice.call(arguments, 0)
       , pointer, index, key, flag;
     pointer = args[0];
     args = args.slice(1);
+
+    // unwrap if the first arqument is wrapped
+    if (pointer instanceof Query) pointer = pointer._pointer
+
     index = _sanitize.apply(this, args);
-    if (!index.length) return pointer;
+    if (!index.length) {
+      this._pointer = pointer;
+      return this;
+    }
     while (index.length) {
       key = index.shift();
       flag = false;
@@ -48,9 +55,13 @@ define('query', ['skin', 'adapter'], function(skin, adapter) {
         break;
       }
     }
-    return (flag)? pointer : null;
-
+    if (flag) {
+      this._pointer = pointer;
+      return this;
+    } else return [];
   }
+
+  Query.get = function(index) { return this._pointer }
 
 
 
