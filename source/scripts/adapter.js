@@ -6,8 +6,11 @@
 define('adapter', ['skin'], function(skin) {
   "use strict";
 
-  // Skin JavaScript Adapter Module
-  // ==============================
+
+
+
+  // Plain JavaScript Adapter Module
+  // ===============================
   var Adapter = skin.Adapter = {}
 
   var Objects    = Adapter.Objects    = Object.prototype
@@ -37,13 +40,16 @@ define('adapter', ['skin'], function(skin) {
       }
     }
   }
+
   Adapter.isEmpty = function(symbol) {
     if (symbol == null) return true;
     if (Adapter.isArray(symbol) || Adapter.isString(symbol)) return symbol.length == 0;
     for (var key in symbol) if (objectHas.call(symbol, key)) return false;
     return true
   }
+
   Adapter.inArray = function(item, array, index) { return Arrays.indexOf.call(array, item, index) }
+
   Adapter.extend = function(target, source, recursive) {
     for (var key in source) {
       if (recursive && (Adapter.isObject(source[key]) || Adapter.isArray(source[key]))) {
@@ -55,6 +61,9 @@ define('adapter', ['skin'], function(skin) {
       else if (target[key]) delete target[key]
     }
   }
+
+
+
 
   return Adapter;
 });

@@ -6,21 +6,24 @@
 define('hub', ['skin', 'adapter'], function(skin, adapter) {
   "use strict";
 
-  // Skin Hub Module
-  // ===============
+
+
+
+  // Hub Module
+  // ==========
   skin.Hub = (function() {
     // singleton instance
     var instance
     function initialize() {
 
-      // Skin Hub Private Methods and Properties
-      // =======================================
+      // Private Methods and Properties
+      // ==============================
       var subscriptions = {}
 
       return {
 
-        // Skin Hub Public Methods
-        // =======================
+        // Public Methods
+        // ==============
         // example: subscribe(publisher, message, callback)
         subscribe: function() {
           var args = slice.call(arguments, 0)
@@ -104,5 +107,8 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       }
     }
   })()
+
+
+
 
 });

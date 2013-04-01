@@ -6,8 +6,11 @@
 define('query', ['skin', 'adapter'], function(skin, adapter) {
   "use strict";
 
-  // Module Private Methods and Properties
-  // =====================================
+
+
+
+  // Private Methods and Properties
+  // ==============================
   // sanitize index, convert multi arguments or chunked string to array
   var _splitter = /[\s.-]/
   function _sanitize() {
@@ -15,8 +18,8 @@ define('query', ['skin', 'adapter'], function(skin, adapter) {
     return (adapter.isArray(args[0]))? args[0] : (args.length > 1)? adapter.arraySlice.call(args, 0) : (adapter.isString(args[0]))? args[0].split(splitter) : []
   }
 
-  // Skin Query Module
-  // =================
+  // Query Module
+  // ============
   // wraps data objects and adds cool functionality
   var Query = skin.Query = function() {
     var args = adapter.arraySlice.call(arguments, 0)
@@ -48,6 +51,9 @@ define('query', ['skin', 'adapter'], function(skin, adapter) {
     return (flag)? pointer : null;
 
   }
+
+
+
 
   return Query;
 });

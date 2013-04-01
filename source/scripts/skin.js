@@ -9,8 +9,8 @@
 
 
 
-  // Module Private Methods and Properties
-  // =====================================
+  // Private Methods and Properties
+  // ==============================
   // shortcuts and references
   // existing skin is kept as oldSkin, to be assigned back in noConflict()
   var _root = this, _oldSkin = _root.skin, _queue = [], _settings, _initialized, _hub
@@ -111,8 +111,8 @@
     }
   }
 
-  // Skin Static Methods and Properties
-  // ==================================
+  // Static Methods and Properties
+  // =============================
   // version
   skin.VERSION = '0.1.1';
   // default settings
