@@ -1,18 +1,11 @@
 $(document).ready(function() {
 
-  var pack = { baseUrl: '../destination/scripts/' }
-    , adapter
-
-  QUnit.config.autostart = false;
-  require(pack, ['adapter'], function(module) {
-    adapter = module
-    QUnit.start();
-    QUnit.config.autostart = true;
-  })
-
   module('Adapter')
 
+  var adapter
+
   test('availability', 1, function() {
+    adapter = skin.Adapter
     ok(adapter != undefined, 'skin adapter is available')
   })
 
@@ -21,6 +14,49 @@ $(document).ready(function() {
     ok(adapter.Arrays === Array.prototype, 'array prototype')
     ok(adapter.arraySlice === Array.prototype.slice, 'array slice')
     ok(adapter.objectHas === Object.prototype.hasOwnProperty, 'object has own property')
+  })
+
+  test('basic helper methods', 33, function() {
+    var array = [1, 2, 3], object = { key: 'value' }, string = "string"
+    ok(adapter.isArray(array), 'detect array by reference')
+    ok(adapter.isArray([]), 'detect empty array on the fly')
+    ok(!adapter.isArray(object), 'object is not array')
+    ok(!adapter.isArray(string), 'string is not array')
+    ok(!adapter.isArray(null), 'null is not array')
+    ok(!adapter.isArray(), 'undefined is not array')
+
+    ok(adapter.isString(string), 'detect string by reference')
+    ok(adapter.isString(''), 'detect empty string')
+    ok(!adapter.isString(array), 'array is not string')
+    ok(!adapter.isString(object), 'object is not string')
+    ok(!adapter.isString(null), 'null is not string')
+    ok(!adapter.isString(), 'undefined is not string')
+
+    ok(adapter.isFunction(function() {}), 'detect function')
+    ok(!adapter.isFunction(object), 'object is not function')
+    ok(!adapter.isFunction(null), 'null is not function')
+    ok(!adapter.isFunction(), 'undefined is not function')
+
+    ok(adapter.isBoolean(true), 'detect boolean')
+    ok(!adapter.isBoolean(object), 'object is not boolean')
+    ok(!adapter.isBoolean(null), 'null is not boolean')
+    ok(!adapter.isBoolean(), 'undefined is not boolean')
+
+    ok(adapter.isUndefined(), 'detect undefined')
+    ok(!adapter.isUndefined(null), 'null is not undefined')
+    ok(!adapter.isUndefined(object), 'object is not undefined')
+
+    ok(adapter.isObject(object), 'detect object by reference')
+    ok(adapter.isObject({}), 'detect empty object on the fly')
+    ok(!adapter.isObject(array), 'array is not object')
+    ok(!adapter.isObject(string), 'string is not object')
+    ok(!adapter.isObject(null), 'null is not object')
+    ok(!adapter.isObject(), 'undefined is not object')
+
+    ok(adapter.isElement(document.body), 'detect element')
+    ok(!adapter.isElement(object), 'object is not element')
+    ok(!adapter.isElement(null), 'null is not element')
+    ok(!adapter.isElement(), 'undefined is not element')
   })
 
 });

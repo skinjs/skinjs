@@ -15,7 +15,7 @@ define('adapter', ['skin'], function(skin) {
     , arraySlice = Adapter.arraySlice = Arrays.slice
     , objectHas  = Adapter.objectHas  = Objects.hasOwnProperty
 
-  Adapter.isArray     = function(symbol) { return symbol.isArray || symbol instanceof Array }
+  Adapter.isArray     = function(symbol) { return symbol != null && (symbol.isArray || symbol instanceof Array) }
   Adapter.isString    = function(symbol) { return typeof(symbol) === 'string' }
   Adapter.isFunction  = function(symbol) { return typeof(symbol) === 'function' }
   Adapter.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean' }

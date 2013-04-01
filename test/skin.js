@@ -1,5 +1,13 @@
 $(document).ready(function() {
 
+  var pack = { baseUrl: '../destination/scripts/' }
+    , modules = ['adapter', 'query']
+
+  QUnit.config.autostart = false
+  require(pack, modules, function() {
+    QUnit.start()
+  })
+
   module('Skin')
 
   test('availability', 1, function() {
