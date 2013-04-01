@@ -1,6 +1,6 @@
 {
   "name": "skin.js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "user interface components and styles for web applications",
   "main": "skin.js",
   "scripts": {

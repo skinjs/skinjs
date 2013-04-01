@@ -1,4 +1,4 @@
-// skin.js 0.1.0
+// skin.js 0.1.1
 // © 2013 Soheil Jadidian
 // skin.js may be freely distributed under the MIT license
 // http://skinjs.org
@@ -56,5 +56,5 @@ define('adapter', ['skin'], function(skin) {
     }
   }
 
-
+  return Adapter;
 });

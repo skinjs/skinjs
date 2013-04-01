@@ -1,4 +1,4 @@
-// skin.js 0.1.0
+// skin.js 0.1.1
 // © 2013 Soheil Jadidian
 // skin.js may be freely distributed under the MIT license
 // http://skinjs.org
@@ -12,7 +12,7 @@
   // Module Private Methods and Properties
   // =====================================
   // shortcuts and references
-  // existing skin is kept as oldSkin, to assign back in noConflict()
+  // existing skin is kept as oldSkin, to be assigned back in noConflict()
   var _root = this, _oldSkin = _root.skin, _queue = [], _settings, _initialized, _hub
 
   // helpers for local use
@@ -36,8 +36,9 @@
     }
   }
 
-  // queue skin calls until initialize is done and core modules are loaded
+  // queue calls until initialize is done, or core or required modules are loaded
   function _enqueue(callback, args, context) { _queue.push([callback, args, context]) }
+  // try to execute queued calls
   function _dequeue() {
     var count, length, succeed
     for (count = 0, length = _queue.length; count < length; count++) {
@@ -54,7 +55,7 @@
     // TODO: implement jQuery, Zepto, Underscore and Backbone versions of adapter
     //       detect which library is available, then load a specific adapter
     //_extend(_settings.pack, { paths: { 'adapter': 'adapter.javascript' }});
-    _load(['hub'], function() {
+    _load(['query'], function() {
       // assign hub
       //_hub = skin.Hub.getInstance();
       // dequeue, if there are standing requests
@@ -64,7 +65,7 @@
     })
   }
 
-  // load modules
+  // load modules, invoke callback
   function _load(modules, callback, args, context) {
     var count, module
     _settings.require(_settings.pack, modules, function() {
@@ -80,9 +81,15 @@
 
 
 
-  // Main Skin Method and Namespace
-  // ==============================
+  // Main Skin Function and Namespace
+  // ================================
   // skin is intentionally not Capitalized
+  // example: skin({ options... })
+  //          skin(name)
+  //          skin(element)
+  //          skin(element, name)
+  //          skin(element, name, { options... })
+  //          skin(element, name).action()
   var skin = _root.skin = function() {
     var args = Array.prototype.slice.call(arguments, 0), element, name, options
     // assign default settings
@@ -107,31 +114,40 @@
   // Skin Static Methods and Properties
   // ==================================
   // version
-  skin.VERSION = '0.1.0';
+  skin.VERSION = '0.1.1';
   // default settings
   skin.defaults = {
     // name, used for plugins, unique id prefix etc.
     alias: 'skin'
     // automatically create plugins for jQuery, Zepto etc.
   , plugin: true
-    // key strings
+    // key strings, used in data objects
   , keys: {
-      UID:   'uid'
-    , ALIAS: 'alias'
+      UID:   '_uid'
+    , ALIAS: '_alias'
     }
     // modules which should be preloaded, for fast invokation
   , preload: ['base', 'sense']
     // require options, base url, paths
   , pack: {}
-    // default method to load other modules
-    // based on define(), proposed by CommonJS
+    // default method for asynchronously loading modules
+    // using define() module definition, proposed by CommonJS
     // for Asynchronous Module Definition (AMD)
+    // require.js or curl.js should be available, otherwise users should
+    // implement or adapt their own loader and assign it to skin through settings
+    // example: skin({ require: function(package, modules, callback) { implementation...} })
   , require: _root.require || _root.curl
   }
 
   // assign cached skin back and return this object
   // example: var newSkin = skin.noConflict()
   skin.noConflict = function() { _root.skin = _oldSkin; return this }
+
+  // methods used by modules or users, to modify core data
+  skin.configure = function() {}
+  skin.template  = function() {}
+  skin.action    = function() {}
+  skin.recipe    = function() {}
 
   // create unique id for everything
   // zero is reserved for null or undefined
