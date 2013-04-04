@@ -55,9 +55,9 @@
     // TODO: implement jQuery, Zepto, Underscore and Backbone versions of adapter
     //       detect which library is available, then load a specific adapter
     //_extend(_settings.pack, { paths: { 'adapter': 'adapter.javascript' }});
-    _load(['query'], function() {
+    _load(['hub'], function() {
       // assign hub
-      //_hub = skin.Hub.getInstance();
+      _hub = skin.Hub.getInstance();
       // dequeue, if there are standing requests
       _dequeue();
       // TODO: implement skin.ready() using events
@@ -99,7 +99,7 @@
     if (_isString(args[0]))  { name    = args[0]; args = args.slice(1) }
     if (_isObject(args[0]))  { options = args[0] }
     // check if only options object is available, configure skin itself
-    // this way we can configure string keys, require, preload and pack before anything is loaded
+    // this way we can configure require, preload and pack before initialize or loading any other module
     if (options && !element && !name) _extend(_settings, options);
     // if skin hasn't been initialized yet, queue the request and initialize
     else if (!_initialized) {
@@ -114,18 +114,13 @@
   // Static Methods and Properties
   // =============================
   // version
-  skin.VERSION = '0.1.1';
+  skin.version = '0.1.1';
   // default settings
   skin.defaults = {
     // name, used for plugins, unique id prefix etc.
     alias: 'skin'
     // automatically create plugins for jQuery, Zepto etc.
   , plugin: true
-    // key strings, used in data objects
-  , keys: {
-      UID:   '_uid'
-    , ALIAS: '_alias'
-    }
     // modules which should be preloaded, for fast invokation
   , preload: ['base', 'sense']
     // require options, base url, paths
@@ -135,7 +130,7 @@
     // for Asynchronous Module Definition (AMD)
     // require.js or curl.js should be available, otherwise users should
     // implement or adapt their own loader and assign it to skin through settings
-    // example: skin({ require: function(package, modules, callback) { implementation...} })
+    // example: skin({ require: function(package, modules, callback) { implementation... }})
   , require: _root.require || _root.curl
   }
 
@@ -148,16 +143,6 @@
   skin.template  = function() {}
   skin.action    = function() {}
   skin.recipe    = function() {}
-
-  // create unique id for everything
-  // zero is reserved for null or undefined
-  // var _token = 0, keys = _settings.keys
-  // skin.uid = function(symbol) {
-  //   if (!symbol) return '0';
-  //   // TODO: stored uid on dom elements should be removed at some point
-  //   if (_isObject(symbol)) return symbol[keys.UID] || (symbol[keys.UID] = ((symbol[keys.ALIAS])? symbol[keys.ALIAS] : '') + ++_token);
-  //   return ((_isString(symbol))? symbol : '') + ++_token;
-  // }
 
 
 
