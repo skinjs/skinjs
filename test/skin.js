@@ -1,12 +1,12 @@
+var pack    = { baseUrl: '../destination/scripts/' }
+  , modules = ['adapter', 'hub']
+
+QUnit.config.autostart = false
+require(pack, modules, function() {
+  QUnit.start()
+})
+
 $(document).ready(function() {
-
-  var pack = { baseUrl: '../destination/scripts/' }
-    , modules = ['adapter', 'query']
-
-  QUnit.config.autostart = false
-  require(pack, modules, function() {
-    QUnit.start()
-  })
 
   module('Skin')
 
