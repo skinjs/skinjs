@@ -176,6 +176,29 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         return false;
       }
 
+      // recursive part of public find() method, collection is passed by reference
+      function _find(collection, pointer, condition, recursive) {
+        if (_match(pointer, condition)) collection.push(pointer);
+        // avoid infinite loop, if the child has a reference to parent
+        if (recursive && adapter.isObject(pointer)) for (var key in pointer) if (key != PARENT) _find(collection, pointer[key], condition, recursive);
+      }
+
+      function _filter(collection, condition, method) {
+        for (var count = 0, length = collection.length; count < length; count++) {
+          if (!_match(collection[count], condition, method)) collection = collection.splice(count, 1);
+        }
+        return collection;
+      }
+
+      function _reject(collection, condition, method) {
+        for (var count = 0, length = collection.length; count < length; count++) {
+          if (_match(collection[count], condition, method)) collection = collection.splice(count, 1);
+        }
+        return collection;
+      }
+
+
+
 
       return {
 
@@ -215,6 +238,27 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         // TODO: implement BASE and MAP
       , match: function(target, condition, method) {
           return _match(target, condition, method);
+        }
+
+        // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
+        // and returns array of pointers to containing children
+        // first arguments are pointer and index, will be passed to get() method
+        // followed by the condition object { key: value }
+        // last boolean argument indicates if we should search children recursively, default is false
+        // example: data.find(pointer, index, { key: 'value' }, recursive);
+      , find: function() {
+          var args = adapter.arraySlice.call(arguments, 0), collection = [], pointer, condition, recursive;
+          // recursive should be the last argument, if its boolean
+          recursive = args.slice(-1)[0];
+          if (adapter.isBoolean(recursive)) args = args.slice(0, -1);
+          else recursive = false;
+          // then the condition
+          condition = args.slice(-1)[0];
+          args = args.slice(0, -1);
+          // remainings can be passed to get()
+          pointer = this.get.apply(this, args);
+          if (pointer) _find(collection, pointer, condition, recursive);
+          return collection;
         }
 
         // example: subscribe(publisher, message, callback)
