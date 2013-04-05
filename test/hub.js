@@ -152,17 +152,37 @@ $(document).ready(function() {
     hub = skin.Hub.getInstance()
 
     hub.set(root, 'z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}})
-    ok(hub.find(root.z, 'a.p.good', { message: 'hello' })[0] === sub.good, 'found the index of containing object, using pointer, string index and condition')
-    ok(hub.find(root.z, ['a', 'p', 'bad'], { message: 'goodbye' })[0] === sub.bad, 'found the index of containing object, using pointer, array index and condition')
+    ok(hub.find(root.z, 'a.p.good', { message: 'hello' }) === sub.good, 'found the index of containing object, using pointer, string index and condition')
+    ok(hub.find(root.z, ['a', 'p', 'bad'], { message: 'goodbye' }) === sub.bad, 'found the index of containing object, using pointer, array index and condition')
+
+    ok(hub.find(root, 'z-a', { b: 1 }) === root.z.a , 'found, using pointer, string index and condition')
+    ok(hub.find(root, 'z-a', { b: 2 }) === null, 'not found, using pointer, string index and condition')
+
+    ok(hub.find(root.z, 'a', 'p', { bad: '*' }) === root.z.a.p, 'found, using pointer, string indices and condition')
+    ok(hub.find(root.z, 'a', 'p', { bad: null }) === null, 'not found, using pointer, string indices and condition')
+
+    ok(hub.find(root, 'z-a', { foo: 'bar' }, true) === root.z.a.p.good, 'found recursively, using pointer, string index and condition')
+    ok(hub.find(root, { b: '*' }, true) === root.z.a, 'found recursively, using pointer and wild card condition')
+  })
+
+  test('search data', 8, function() {
+    var root = { a: 1000, z: 0 }
+      , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
+
+    hub = skin.Hub.getInstance()
+
+    hub.set(root, 'z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}})
+    ok(hub.search(root.z, 'a.p.good', { message: 'hello' })[0] === sub.good, 'found the index of containing object, using pointer, string index and condition')
+    ok(hub.search(root.z, ['a', 'p', 'bad'], { message: 'goodbye' })[0] === sub.bad, 'found the index of containing object, using pointer, array index and condition')
     
-    equal(hub.find(root, 'z-a', { b: 1 }).length, 1, 'found, using pointer, string index and condition')
-    equal(hub.find(root, 'z-a', { b: 2 }).length, 0, 'not found, using pointer, string index and condition')
+    equal(hub.search(root, 'z-a', { b: 1 }).length, 1, 'found, using pointer, string index and condition')
+    equal(hub.search(root, 'z-a', { b: 2 }).length, 0, 'not found, using pointer, string index and condition')
 
-    equal(hub.find(root.z, 'a', 'p', { bad: '*' }).length, 1, 'found, using pointer, string indices and condition')
-    equal(hub.find(root.z, 'a', 'p', { bad: null }).length, 0, 'not found, using pointer, string indices and condition')
+    equal(hub.search(root.z, 'a', 'p', { bad: '*' }).length, 1, 'found, using pointer, string indices and condition')
+    equal(hub.search(root.z, 'a', 'p', { bad: null }).length, 0, 'not found, using pointer, string indices and condition')
 
-    equal(hub.find(root, 'z-a', { foo: 'bar' }, true).length, 2, 'found recursively, using pointer, string index and condition')
-    equal(hub.find(root, { b: '*' }, true).length, 2, 'found recursively, using pointer and wild card condition')
+    equal(hub.search(root, 'z-a', { foo: 'bar' }, true).length, 2, 'found recursively, using pointer, string index and condition')
+    equal(hub.search(root, { b: '*' }, true).length, 2, 'found recursively, using pointer and wild card condition')
   })
 
   test('filter and reject data', 3, function() {

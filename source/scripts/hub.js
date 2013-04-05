@@ -51,7 +51,8 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       // zero is reserved for null or undefined
       function _uid(symbol) {
         if (!symbol) return '0';
-        // TODO: stored uid on dom elements should be removed at some point
+        if (adapter.isElement(symbol)) {
+        }
         if (adapter.isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++_token);
         return ((adapter.isString(symbol))? symbol : '') + ++_token;
       }
@@ -184,11 +185,22 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         return false;
       }
 
-      // recursive part of public find() method, collection is passed by reference
-      function _find(collection, pointer, condition, recursive) {
+      function _search(collection, pointer, condition, recursive) {
+        var key;
         if (_match(pointer, condition)) collection.push(pointer);
         // avoid infinite loop, if the child has a reference to parent
-        if (recursive && adapter.isObject(pointer)) for (var key in pointer) if (key != PARENT) _find(collection, pointer[key], condition, recursive);
+        if (recursive && adapter.isObject(pointer)) for (key in pointer) if (key != PARENT) _search(collection, pointer[key], condition, recursive);
+      }
+
+      function _find(pointer, condition, recursive) {
+        var key, result;
+        if (_match(pointer, condition)) return pointer;
+        // avoid infinite loop, if the child has a reference to parent
+        if (recursive && adapter.isObject(pointer)) for (key in pointer) if (key != PARENT) {
+          result = _find(pointer[key], condition, recursive);
+          if (result) return result;
+        }
+        return null;
       }
 
       function _filter(collection, condition, method) {
@@ -220,9 +232,9 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         message.unshift(_uid(publisher));
         node = _get(_nodes, message.slice(0));
         if (!node) return;
-        // set condition and finding callbacks in sub branches
+        // set condition and find callbacks in sub branches
         condition[CALLBACKS] = (callback)? [callback] : '*';
-        _find(nodes, node, condition, true);
+        _search(nodes, node, condition, true);
         // removing callbacks
         for (node in nodes) {
           callbacks = nodes[node][CALLBACKS];
@@ -235,9 +247,9 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         var nodes = [], node, callbacks, callback, condition = {};
         message.unshift(_uid(publisher));
         node = _get(_nodes, message.slice(0));
-        // set condition and finding callbacks in sub branches
+        // set condition and find callbacks in sub branches
         condition[CALLBACKS] = '*';
-        _find(nodes, node, condition, true);
+        _search(nodes, node, condition, true);
         // calling callbacks
         for (node in nodes) {
           callbacks = nodes[node][CALLBACKS];
@@ -302,13 +314,13 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
           return _reject(collection, condition, method);
         }
 
-        // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
-        // and returns array of pointers to containing children
+        // search and find all children meeting a condition in given pointer, index
+        // and return array of pointers to children
         // first arguments are pointer and index, will be passed to get() method
         // followed by the condition object { key: value }
         // last boolean argument indicates if we should search children recursively, default is false
-        // example: data.find(pointer, index, { key: 'value' }, recursive);
-      , find: function() {
+        // example: search(pointer, index, condition, recursive);
+      , search: function() {
           var args = adapter.arraySlice.call(arguments, 0), collection = [], pointer, condition, recursive;
           // recursive should be the last argument, if its boolean
           recursive = args.slice(-1)[0];
@@ -319,8 +331,28 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
           args = args.slice(0, -1);
           // remainings can be passed to get()
           pointer = this.get.apply(this, args);
-          if (pointer) _find(collection, pointer, condition, recursive);
+          _search(collection, pointer, condition, recursive);
           return collection;
+        }
+
+        // search and find the first child meeting a condition in given pointer, index
+        // and return the pointer to the child
+        // first arguments are pointer and index, will be passed to get() method
+        // followed by the condition object { key: value }
+        // last boolean argument indicates if we should search children recursively, default is false
+        // example: search(pointer, index, condition, recursive);
+      , find: function() {
+          var args = adapter.arraySlice.call(arguments, 0), pointer, condition, recursive;
+          // recursive should be the last argument, if its boolean
+          recursive = args.slice(-1)[0];
+          if (adapter.isBoolean(recursive)) args = args.slice(0, -1);
+          else recursive = false;
+          // then the condition
+          condition = args.slice(-1)[0];
+          args = args.slice(0, -1);
+          // remainings can be passed to get()
+          pointer = this.get.apply(this, args);
+          return _find(pointer, condition, recursive);
         }
 
         // example: on(object, event, callback)
