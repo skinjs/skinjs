@@ -29,7 +29,7 @@ define('adapter', ['skin'], function(skin) {
   Adapter.each = function(object, iterator, context) {
     if (!object) return;
     if (isArray(object)) {
-      for (var count = 0, length = object.length; count < length; count++) {
+      for (var count = 0; count < object.length; count++) {
         if (iterator.call(context, object[count], count, object) === false) return;
       }
     } else {

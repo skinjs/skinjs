@@ -10,10 +10,12 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
 
 
   // key strings, used in data objects
-  var UID    = 'uid'
-    , ALIAS  = 'alias'
-    , BASE   = 'base'
-    , PARENT = 'parent';
+  var UID       = 'uid'
+    , ALIAS     = 'alias'
+    , BASE      = 'base'
+    , PARENT    = 'parent'
+    , NODES     = 'nodes'
+    , CALLBACKS = 'callbacks';
 
 
 
@@ -25,12 +27,16 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
 
       // Private Methods and Properties
       // ==============================
-        // main data object
-      var _cache    = {}
+        // data objects
+      var _cache, _nodes, _templates, _actions, _recipes
         // to split and sanitize index paths
         , _splitter = /[\s.-]/
         // counter for generating unique ids
-        , _token    = 0
+        , _token = 0;
+
+      // initiate data
+      _cache = {};
+      _nodes = _set(_cache, [NODES], {});
 
       // sanitize index, convert multi arguments or chunked string to array
       function _sanitize() {
@@ -119,7 +125,9 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
               for (key in value) _set(pointer, [key], value[key]);
             } else {
               // replace or create the value
-              pointer = pointer[key] = value;
+              pointer[key] = value;
+              if (adapter.isObject(value)) value[PARENT] = pointer;
+              pointer = pointer[key];
             }
           }
         }
@@ -184,21 +192,65 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       }
 
       function _filter(collection, condition, method) {
-        for (var count = 0, length = collection.length; count < length; count++) {
-          if (!_match(collection[count], condition, method)) collection = collection.splice(count, 1);
+        for (var count = collection.length - 1; count >= 0; count--) {
+          if (!_match(collection[count], condition, method)) collection.splice(count, 1);
         }
         return collection;
       }
 
       function _reject(collection, condition, method) {
-        for (var count = 0, length = collection.length; count < length; count++) {
-          if (_match(collection[count], condition, method)) collection = collection.splice(count, 1);
+        for (var count = collection.length - 1; count >= 0; count--) {
+          if (_match(collection[count], condition, method)) collection.splice(count, 1);
         }
         return collection;
       }
 
+      function _subscribe(publisher, message, callback) {
+        var node, callbacks;
+        message.unshift(_uid(publisher));
+        node = _get(_nodes, message.slice(0)) || _set(_nodes, message.slice(0), {});
+        callbacks = node[CALLBACKS] || (node[CALLBACKS] = []);
+        // TODO: check indexOf() is supported
+        if (callbacks.indexOf(callback) == -1) callbacks.push(callback);
+      }
 
+      function _unsubscribe(publisher, message, callback) {
+        var nodes = [], node, callbacks, callback, condition = {};
+        message || (message = []);
+        message.unshift(_uid(publisher));
+        node = _get(_nodes, message.slice(0));
+        if (!node) return;
+        // set condition and finding callbacks in sub branches
+        condition[CALLBACKS] = (callback)? [callback] : '*';
+        _find(nodes, node, condition, true);
+        // removing callbacks
+        for (node in nodes) {
+          callbacks = nodes[node][CALLBACKS];
+          callbacks.splice(callbacks.indexOf(callback), 1)
+        }
+        // TODO: clean empty branch
+      }
 
+      function _publish(publisher, message, parameters) {
+        var nodes = [], node, callbacks, callback, condition = {};
+        message.unshift(_uid(publisher));
+        node = _get(_nodes, message.slice(0));
+        // set condition and finding callbacks in sub branches
+        condition[CALLBACKS] = '*';
+        _find(nodes, node, condition, true);
+        // calling callbacks
+        for (node in nodes) {
+          callbacks = nodes[node][CALLBACKS];
+          for (callback in callbacks) {
+            try {
+              // TODO: if a callback returns false break the chain
+              callbacks[callback](parameters);
+            } catch(exception) {
+              throw exception;
+            }
+          }
+        }
+      }
 
       return {
 
@@ -240,6 +292,16 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
           return _match(target, condition, method);
         }
 
+        // filter an array, keep items which match a condition
+      , filter: function(collection, condition, method) {
+          return _filter(collection, condition, method);
+        }
+
+        // reject an array, remove items which match a condition
+      , reject: function(collection, condition, method) {
+          return _reject(collection, condition, method);
+        }
+
         // find { key: value, anotherKey: anotherValue } pairs in given pointer, index
         // and returns array of pointers to containing children
         // first arguments are pointer and index, will be passed to get() method
@@ -261,77 +323,31 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
           return collection;
         }
 
-        // example: subscribe(publisher, message, callback)
-      , subscribe: function() {
-          var args = slice.call(arguments, 0)
-            , publisher, message, callback, index, subscriber, callbacks
-          if (!isString(args[0])) {
-            publisher = args[0];
-            args = args.slice(1);
-          }
-          message    = args[0];
-          callback   = args[1];
-          index      = uid(publisher) + '.' + message;
-          subscriber = Data.get(subscriptions, index) || Data.set(true, subscriptions, index, {})
-          callbacks  = subscriber[CALLBACKS]          || (subscriber[CALLBACKS] = [])
-          if (callbacks.indexOf(callback) == -1) callbacks.push(callback)
+        // example: on(object, event, callback)
+      , on: function() {
+          var args = adapter.arraySlice.call(arguments, 0), publisher, message, callback;
+          if (!adapter.isString(args[0])) { publisher = args[0]; args = args.slice(1); }
+          message = _sanitize(args[0]);
+          callback = args[1];
+          _subscribe(publisher, message, callback);
         }
 
-        // example: unsubscribe(publisher, message, callback)
-      , unsubscribe: function() {
-          var args      = slice.call(arguments, 0)
-            , condition = {}
-            , subscription, subscribers, publisher, message, callback, subscriber, callbacks, count
-          if (!isString(args[0])) {
-            publisher = args[0];
-            args = args.slice(1);
-          }
-          subscription = subscriptions[uid(publisher)];
-          if (!subscription) return;
-          if (isString(args[0])) {
-            message = args[0];
-            args = args.slice(1);
-          }
-          condition[CALLBACKS] = '*';
-          if (isFunction(args[0])) {
-            callback = args[0];
-            condition[CALLBACKS] = [callback];
-          }
-          subscribers = Data.find(subscription, message, condition, true);
-          for (subscriber in subscribers) {
-            callbacks = subscribers[subscriber][CALLBACKS]
-            callbacks.splice(callbacks.indexOf(callback), 1)
-          }
-          // TODO: clean empty branch
+        // example: off(object, event, callback)
+      , off: function() {
+          var args = adapter.arraySlice.call(arguments, 0), publisher, message, callback;
+          if (!adapter.isString(args[0])) { publisher = args[0]; args = args.slice(1); }
+          if (adapter.isString(args[0])) { message = _sanitize(args[0]); args = args.slice(1); }
+          if (adapter.isFunction(args[0])) { callback = args[0]; }
+          _unsubscribe(publisher, message, callback);
         }
 
-        // example: publish(publisher, message, data)
-      , publish: function() {
-          var args      = slice.call(arguments, 0)
-            , condition = {}
-            , publisher, message, index, subscribers, subscriber, callbacks, callback
-          if (!isString(args[0])) {
-            publisher = args[0];
-            args = args.slice(1);
-          }
-          message = args[0];
-          args    = args.slice(1);
-          index   = uid(publisher) + '.' + message;
-          // set condition and finding callbacks in sub branches
-          condition[CALLBACKS] = '*';
-          subscribers = Data.find(subscriptions, index, condition, true);
-          // calling callbacks
-          for (subscriber in subscribers) {
-            callbacks = subscribers[subscriber][CALLBACKS];
-            for (callback in callbacks) {
-              try {
-                // TODO: if a callback returns false break the chain
-                callbacks[callback](args[0]);
-              } catch(exception) {
-                throw exception;
-              }
-            }
-          }
+        // example: trigger(object, event, parameters)
+      , trigger: function() {
+          var args = adapter.arraySlice.call(arguments, 0), publisher, message, parameters;
+          if (!adapter.isString(args[0])) { publisher = args[0]; args = args.slice(1); }
+          message = _sanitize(args[0]);
+          parameters = args[1];
+          _publish(publisher, message, parameters);
         }
       }
     }

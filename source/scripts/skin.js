@@ -39,13 +39,14 @@
   // queue calls until initialize is done, or core or required modules are loaded
   function _enqueue(callback, args, context) { _queue.push([callback, args, context]) }
   // try to execute queued calls
+  // TODO: this is LIFO now
   function _dequeue() {
-    var count, length, succeed
-    for (count = 0, length = _queue.length; count < length; count++) {
+    var count, succeed;
+    for (count = _queue.length; count >= 0; count--) {
       succeed = true;
       try { _queue[count][0].apply(_queue[count][2] || this, _queue[count][1]) }
       catch(exception) { succeed = false }
-      finally { if (succeed) _queue = _queue.splice(count, 1) }
+      finally { if (succeed) _queue.splice(count, 1) }
     }
   }
 
