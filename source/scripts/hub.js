@@ -15,7 +15,8 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
     , BASE      = 'base'
     , PARENT    = 'parent'
     , NODES     = 'nodes'
-    , CALLBACKS = 'callbacks';
+    , CALLBACKS = 'callbacks'
+    , ELEMENT   = 'element';
 
 
 
@@ -28,7 +29,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       // Private Methods and Properties
       // ==============================
         // data objects
-      var _cache, _nodes, _templates, _actions, _recipes
+      var _cache, _data, _nodes, _templates, _actions, _recipes
         // to split and sanitize index paths
         , _splitter = /[\s.-]/
         // counter for generating unique ids
@@ -36,7 +37,8 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
 
       // initiate data
       _cache = {};
-      _nodes = _set(_cache, [NODES], {});
+      _data  = {};
+      _nodes = _set(_data, [NODES], {});
 
       // sanitize index, convert multi arguments or chunked string to array
       function _sanitize() {
@@ -47,11 +49,22 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
              : []
       }
 
-      // create unique id for everything
+      // create and retrieve unique id for null, undefined, objects and elements
       // zero is reserved for null or undefined
       function _uid(symbol) {
         if (!symbol) return '0';
         if (adapter.isElement(symbol)) {
+          if (symbol === _cache[ELEMENT]) return _cache[UID];
+          var node, condition = {};
+          _cache[ELEMENT] = condition[ELEMENT] = symbol;
+          node = _find(_nodes, condition, true);
+          if (!node) {
+            node = {};
+            node[ELEMENT] = symbol;
+            node[UID] = '' + ++_token;
+            _set(_nodes, [node[UID]], node);
+          }
+          return _cache[UID] = node[UID];
         }
         if (adapter.isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++_token);
         return ((adapter.isString(symbol))? symbol : '') + ++_token;
@@ -273,7 +286,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         // returns null if the path doesn't exist
         // example: get(pointer, index)
         get: function() {
-          var args = adapter.arraySlice.call(arguments, 0), pointer = _cache, index;
+          var args = adapter.arraySlice.call(arguments, 0), pointer = _data, index;
           if (adapter.isObject(args[0])) { pointer = args[0]; args = args.slice(1) }
           index = _sanitize.apply(this, args);
           return _get(pointer, index);
@@ -284,7 +297,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         // returns pointer to the last modified object or array
         // example: set(pointer, index, value)
       , set: function() {
-          var args = adapter.arraySlice.call(arguments, 0), pointer = _cache, index, value;
+          var args = adapter.arraySlice.call(arguments, 0), pointer = _data, index, value;
           // last argument is always the value
           value = args.slice(-1)[0];
           args = args.slice(0, -1);
