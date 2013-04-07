@@ -1,15 +1,16 @@
 $(document).ready(function() {
 
-  module('Adapter')
+  module('adapter')
 
   var adapter
 
   test('availability', 1, function() {
-    adapter = skin.Adapter
+    adapter = skin.adapter
     ok(adapter != undefined, 'skin adapter is available')
   })
 
   test('shortcuts', 4, function() {
+    adapter = skin.adapter
     ok(adapter.Objects === Object.prototype, 'object prototype')
     ok(adapter.Arrays === Array.prototype, 'array prototype')
     ok(adapter.arraySlice === Array.prototype.slice, 'array slice')
@@ -17,6 +18,7 @@ $(document).ready(function() {
   })
 
   test('basic helper methods', 33, function() {
+    adapter = skin.adapter
     var array = [1, 2, 3], object = { key: 'value' }, string = "string"
     ok(adapter.isArray(array), 'detect array by reference')
     ok(adapter.isArray([]), 'detect empty array on the fly')
@@ -57,6 +59,14 @@ $(document).ready(function() {
     ok(!adapter.isElement(object), 'object is not element')
     ok(!adapter.isElement(null), 'null is not element')
     ok(!adapter.isElement(), 'undefined is not element')
+  })
+
+  test('object keys', 2, function() {
+    adapter = skin.adapter
+    var full  = { a: 1, b: { c: true }, d: undefined, e: null, f: 'foo', g: [1, 2, 3] }
+      , empty = {}
+    equal(adapter.keys(full).length, 6, 'got object keys for full object')
+    equal(adapter.keys(empty).length, 0, 'did not get object keys for empty object')
   })
 
 });

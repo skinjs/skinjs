@@ -9,61 +9,62 @@ define('adapter', ['skin'], function(skin) {
 
 
 
-  // Plain JavaScript Adapter Module
-  // ===============================
-  var Adapter = skin.Adapter = {}
+  // Skin JavaScript Adapter Module
+  // ==============================
+  // extends existing basic adapter
+  var _adapter = skin.adapter;
+  _adapter.extend({
 
-  var Objects    = Adapter.Objects    = Object.prototype
-    , Arrays     = Adapter.Arrays     = Array.prototype
-    , arraySlice = Adapter.arraySlice = Arrays.slice
-    , objectHas  = Adapter.objectHas  = Objects.hasOwnProperty
+    // get an array of object keys
+    keys: Object.keys || function(symbol) {
+      var keys = [], key;
+      for (key in symbol) if (_adapter.objectHas(symbol, key)) keys.push(key);
+      return keys;
+    }
 
-  Adapter.isArray     = function(symbol) { return symbol != null && (symbol.isArray || symbol instanceof Array) }
-  Adapter.isString    = function(symbol) { return typeof(symbol) === 'string' }
-  Adapter.isFunction  = function(symbol) { return typeof(symbol) === 'function' }
-  Adapter.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean' }
-  Adapter.isUndefined = function(symbol) { return typeof(symbol) === 'undefined' }
-  Adapter.isObject    = function(symbol) { return symbol != null && typeof(symbol) === 'object' && !Adapter.isArray(symbol) }
-  Adapter.isElement   = function(symbol) { return symbol != null && symbol.nodeType == Node.ELEMENT_NODE }
-
-  Adapter.each = function(object, iterator, context) {
-    if (!object) return;
-    if (isArray(object)) {
-      for (var count = 0; count < object.length; count++) {
-        if (iterator.call(context, object[count], count, object) === false) return;
+    // get an element's offset x, y
+  , offset: function(element) {
+      var left = top = 0, pointer = element;
+      while (pointer != null) {
+        left += pointer.offsetLeft;
+        top  += pointer.offsetTop;
+        pointer = pointer.offsetParent;
       }
-    } else {
-      for (var key in obj) {
-        if (objectHas.call(object, key)) {
-          if (iterator.call(context, object[key], key, object) === false) return;
+      return { x: left, y: top };
+    }
+
+    // iterate an object or array, call iterator on every item
+  , each: function(object, iterator, context) {
+      if (!object) return;
+      if (_adapter.isArray(object)) {
+        for (var count = 0; count < object.length; count++) {
+          if (iterator.call(context, object[count], count, object) === false) return;
+        }
+      } else {
+        for (var key in obj) {
+          if (_adapter.objectHas.call(object, key)) {
+            if (iterator.call(context, object[key], key, object) === false) return;
+          }
         }
       }
     }
-  }
 
-  Adapter.isEmpty = function(symbol) {
-    if (symbol == null) return true;
-    if (Adapter.isArray(symbol) || Adapter.isString(symbol)) return symbol.length == 0;
-    for (var key in symbol) if (objectHas.call(symbol, key)) return false;
-    return true
-  }
-
-  Adapter.inArray = function(item, array, index) { return Arrays.indexOf.call(array, item, index) }
-
-  Adapter.extend = function(target, source, recursive) {
-    for (var key in source) {
-      if (recursive && (Adapter.isObject(source[key]) || Adapter.isArray(source[key]))) {
-        if (Adapter.isObject(source[key]) && !Adapter.isObject(target[key])) target[key] = {}
-        if (Adapter.isArray(source[key])  && !Adapter.isArray(target[key]))  target[key] = []
-        Adapter.extend(target[key], source[key], recursive)
-      }
-      else if (source[key] !== undefined) target[key] = source[key]
-      else if (target[key]) delete target[key]
+    // check object, array, string or null
+  , isEmpty: function(symbol) {
+      if (symbol == null) return true;
+      if (_adapter.isArray(symbol) || _adapter.isString(symbol)) return symbol.length == 0;
+      for (var key in symbol) if (_adapter.objectHas.call(symbol, key)) return false;
+      return true;
     }
-  }
+
+    // get index of an item
+    // TODO: IE8 doesn't support indexOf
+  , inArray: function(item, array, index) { return Arrays.indexOf.call(array, item, index); }
+
+  });
 
 
 
 
-  return Adapter;
+  return _adapter;
 });
