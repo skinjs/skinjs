@@ -1,18 +1,18 @@
 $(document).ready(function() {
 
-  module('Hub')
+  module('hub')
 
   var hub
     , a = { foo: 'bar', array: [1, 2, 3], flag: true }
     , b = { object: a, x: 1, y: 2, z: false }
 
   test('availability', 1, function() {
-    hub = skin.Hub.getInstance()
+    hub = skin.hub
     ok(hub != undefined, 'skin hub is available')
   })
 
   test('get data', 6, function() {
-    hub = skin.Hub.getInstance()
+    hub = skin.hub
     equal(hub.get(b.object), a, 'got data by pointer')
     equal(hub.get(b, 'y'), 2, 'got data by pointer and string index')
     equal(hub.get(b, 'object.array'), a.array, 'got data by pointer and string index')
@@ -22,7 +22,7 @@ $(document).ready(function() {
   })
 
   test('set data', 6, function() {
-    hub = skin.Hub.getInstance()
+    hub = skin.hub
     hub.set(b, 'x', 2);
     equal(b.x, 2, 'set data by pointer and index')
 
@@ -45,10 +45,10 @@ $(document).ready(function() {
   })
 
   test('based data', 3, function() {
+    hub = skin.hub
     // assuming that 'base' is the key for base object
     var someData  = { foo: 'bar', boo: 'baz' }
       , basedData = { base: someData }
-    hub = skin.Hub.getInstance()
     hub.set(b, 'myBasedData', basedData)
     equal(hub.get(b.myBasedData, 'boo'), 'baz', 'access to based on reference data')
     hub.set(b, 'myBasedData', 'foo', false)
@@ -57,8 +57,8 @@ $(document).ready(function() {
   })
 
   test('remove, non existing data', 2, function() {
+    hub = skin.hub
     var data = {}
-    hub = skin.Hub.getInstance()
     hub.set(data, 'a.b.c', { d: { e: 'f' }})
     equal(hub.get(data, 'a.b.z'), null, 'null returned for non existing index')
     hub.set(data, ['a', 'b'], undefined)
@@ -66,12 +66,11 @@ $(document).ready(function() {
   })
 
   test('match data', 52, function() {
+    hub = skin.hub
     var func  = function() {}
       , sub   = { w: { a: 1, b: 2 }, x: true, y: false, z: func }
       , root  = { a: 1, b: 2, c: { foo: 'bar', a: { b: 1 }}, d: true, e: sub, f: false }
       , array = [1, 2, root, true, { a: 2, b: 3 }]
-
-    hub = skin.Hub.getInstance()
 
     ok(hub.match(1, 1), 'numeric match')
     ok(!hub.match(1, 2), 'numeric mismatch')
@@ -146,10 +145,9 @@ $(document).ready(function() {
   })
 
   test('find data', 8, function() {
+    hub = skin.hub
     var root = { a: 1000, z: 0 }
       , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
-
-    hub = skin.Hub.getInstance()
 
     hub.set(root, 'z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}})
     ok(hub.find(root.z, 'a.p.good', { message: 'hello' }) === sub.good, 'found the index of containing object, using pointer, string index and condition')
@@ -166,10 +164,9 @@ $(document).ready(function() {
   })
 
   test('search data', 8, function() {
+    hub = skin.hub
     var root = { a: 1000, z: 0 }
       , sub  = { good: { message: 'hello', foo: 'bar' }, bad: { message: 'goodbye', foo: 'bar' }}
-
-    hub = skin.Hub.getInstance()
 
     hub.set(root, 'z', { a: { b: 1, c: 'foo', p: sub, d: { b: 1, c: 'bar', d: { a: true, g: 'foo' }}}})
     ok(hub.search(root.z, 'a.p.good', { message: 'hello' })[0] === sub.good, 'found the index of containing object, using pointer, string index and condition')
@@ -186,8 +183,7 @@ $(document).ready(function() {
   })
 
   test('filter and reject data', 3, function() {
-    hub = skin.Hub.getInstance()
-
+    hub = skin.hub
     var test = { message: 'hi!' }
       , data = [{ a: 1, b: 2 }, { a: 2, b: { c: 3 }}, { b: 5 }, test, { foo: 'bar' }]
       , result
@@ -208,8 +204,7 @@ $(document).ready(function() {
   })
 
   test('on, off and trigger', 40, function() {
-    hub = skin.Hub.getInstance()
-
+    hub = skin.hub
     var modified = 'not modified'
       , counter  = 0
       , reset    = function() { modified = 'not modified'; counter = 0 }
@@ -335,7 +330,6 @@ $(document).ready(function() {
     equal(modified, 'not modified', 'all callbacks for publisher unsubscribed')
     equal(counter, 0, '0 callbacks were invoked')
     reset()
-
   })
 
 });
