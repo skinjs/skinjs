@@ -8,7 +8,7 @@ require(pack, modules, function() {
 
 $(document).ready(function() {
 
-  module('Skin')
+  module('skin')
 
   test('availability', 1, function() {
     ok(window.skin === skin && typeof skin === 'function', 'skin function is available');
