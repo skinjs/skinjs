@@ -1,10 +1,9 @@
-// skin.js 0.1.1
+// skin.js 0.1.2
 // © 2013 Soheil Jadidian
 // skin.js may be freely distributed under the MIT license
 // http://skinjs.org
 
 define('hub', ['skin', 'adapter'], function(skin, adapter) {
-  "use strict";
 
 
 
@@ -34,11 +33,11 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
 
   // sanitize index, convert multi arguments or chunked string to array
   function _sanitize() {
-    var args = arguments
+    var args = arguments;
     return (adapter.isArray(args[0]))? args[0]
     : (args.length > 1)? adapter.arraySlice.call(args, 0)
     : (adapter.isString(args[0]))? args[0].split(_splitter)
-    : []
+    : [];
   }
 
   // create and retrieve unique id for window, null, undefined, objects and elements
@@ -53,13 +52,14 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       if (!node) {
         node = {};
         node[ELEMENT] = symbol;
-        node[UID] = '' + ++_token;
+        node[UID] = '' + (++_token);
         _set(_nodes, [node[UID]], node);
       }
-      return _cache[UID] = node[UID];
+      _cache[UID] = node[UID];
+      return _cache[UID];
     }
-    if (adapter.isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + ++_token);
-    return ((adapter.isString(symbol))? symbol : '') + ++_token;
+    if (adapter.isObject(symbol)) return symbol[UID] || (symbol[UID] = ((symbol[ALIAS])? symbol[ALIAS] : '') + (++_token));
+    return ((adapter.isString(symbol))? symbol : '') + (++_token);
   }
 
   function _get(pointer, index) {
@@ -99,7 +99,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         } else {
           // only a single key has been passed in, no other arguments
           // create an empty object for that key if it doesn't exist
-          pointer[value] || (pointer[value] = {});
+          if (!pointer[value]) pointer[value] = {};
           pointer[value][PARENT] = pointer;
           pointer = pointer[value];
         }
@@ -123,7 +123,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         // no more levels, last key
         // if value is undefined, we remove the key by convension
         // no one wants a key pointing to undefined!
-        if (value == undefined) delete pointer[key];
+        if (adapter.isUndefined(value)) delete pointer[key];
         else if (key != BASE && adapter.isObject(value) && adapter.isObject(pointer[key])) {
           // merge two objects, keep existing reference
           pointer[key][PARENT] = pointer;
@@ -165,14 +165,14 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
         }
       }
       // inverse check, in exact match all target keys should have been covered
-      if (method == true) for (key in target) if (adapter.isUndefined(condition[key])) return false;
+      if (method === true) for (key in target) if (adapter.isUndefined(condition[key])) return false;
       return (adapter.isUndefined(method))? false : true;
     }
     // recursive match for arrays
     if (adapter.isArray(condition) && adapter.isArray(target)) {
       var c, t, matched = [];
       // simple check if lengths are equal for exact match
-      if (method == true && condition.length != target.length) return false;
+      if (method === true && condition.length != target.length) return false;
       // go through all items for both
       for (c = 0; c < condition.length; c++) {
         for (t = 0; t < target.length; t++) {
@@ -232,8 +232,8 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
   }
 
   function _unsubscribe(publisher, message, callback) {
-    var nodes = [], node, callbacks, callback, condition = {};
-    message || (message = []);
+    var nodes = [], node, callbacks, condition = {};
+    if (!message) message = [];
     message.unshift(_uid(publisher));
     node = _get(_nodes, message.slice(0));
     if (!node) return;
@@ -243,7 +243,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
     // removing callbacks
     for (node in nodes) {
       callbacks = nodes[node][CALLBACKS];
-      callbacks.splice(callbacks.indexOf(callback), 1)
+      callbacks.splice(callbacks.indexOf(callback), 1);
     }
     // TODO: clean empty branch
   }
@@ -282,7 +282,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
     // example: get(pointer, index)
     get: function() {
       var args = adapter.arraySlice.call(arguments, 0), pointer = _data, index;
-      if (adapter.isObject(args[0])) { pointer = args[0]; args = args.slice(1) }
+      if (adapter.isObject(args[0])) { pointer = args[0]; args = args.slice(1); }
       index = _sanitize.apply(this, args);
       return _get(pointer, index);
     }
@@ -297,7 +297,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       value = args.slice(-1)[0];
       args = args.slice(0, -1);
       // if first argument is object, it is the pointer
-      if (adapter.isObject(args[0])) { pointer = args[0]; args = args.slice(1) }
+      if (adapter.isObject(args[0])) { pointer = args[0]; args = args.slice(1); }
       index = _sanitize.apply(this, args);
       return _set(pointer, index, value);
     }
@@ -389,7 +389,7 @@ define('hub', ['skin', 'adapter'], function(skin, adapter) {
       parameters = args[1];
       _publish(publisher, message, parameters);
     }
-  }
+  };
 
 
 

@@ -7,21 +7,21 @@ module.exports = function(grunt) {
   };
 
   grunt.initConfig({
-    pkg: grunt.file.readJSON("package.json"),
-    options: readOptionalJSON("options.json"),
+    pkg: grunt.file.readJSON('package.json'),
+    options: readOptionalJSON('options.json'),
 
     less: {
       options: {
-        paths: ["source/styles"],
+        paths: ['source/styles'],
         yuicompress: true
       },
       files: {
         expand: true,
-        cwd: "source/styles",
-        src: ["**/*.less"],
-        dest: "destination/styles/",
-        ext: ".css",
-      },
+        cwd: 'source/styles',
+        src: ['**/*.less'],
+        dest: 'destination/styles/',
+        ext: '.css'
+      }
     },
 
     coffee: {
@@ -30,88 +30,70 @@ module.exports = function(grunt) {
       },
       files: {
         expand: true,
-        cwd: "source/scripts",
-        src: ["**/*.coffee"],
-        dest: "destination/scripts/",
-        ext: ".js",
-      },
+        cwd: 'source/scripts',
+        src: ['**/*.coffee'],
+        dest: 'destination/scripts/',
+        ext: '.js'
+      }
     },
 
     uglify: {
       options: {
         beautify: true,
         mangle: false,
-        banner: '/*! <%= pkg.name %> - <%= pkg.version %> - ' + '<%= grunt.template.today("yyyy-mm-dd") %> */',
+        banner: '/*! <%= pkg.name %> - <%= pkg.version %> - ' + '<%= grunt.template.today("yyyy-mm-dd") %> */'
       },
       files: {
         expand: true,
-        cwd: "source/scripts",
-        src: ["**/*.js"],
-        dest: "destination/scripts/",
-        ext: ".js",
-      },
+        cwd: 'source/scripts',
+        src: ['**/*.js'],
+        dest: 'destination/scripts/',
+        ext: '.js'
+      }
     },
 
     rsync: {
       scripts: {
-        src: "destination/scripts/",
-        dest: "<%= options.rsync.scripts.dest %>",
+        src: 'destination/scripts/',
+        dest: '<%= options.rsync.scripts.dest %>',
         recursive: true,
-        syncDest: true,
+        syncDest: true
       },
       styles: {
-        src: "destination/styles/",
-        dest: "<%= options.rsync.styles.dest %>",
+        src: 'destination/styles/',
+        dest: '<%= options.rsync.styles.dest %>',
         recursive: true,
-        syncDest: true,
-      },
+        syncDest: true
+      }
     },
 
     jshint: {
-      files: ['gruntfile.js', 'source/**/*.js', 'test/**/*.js'],
+      files: ['Gruntfile.js', 'source/**/*.js'],
       options: {
-        "curly": true,
-        "expr": true,
-        "newcap": false,
-        "quotmark": "double",
-        "regexdash": true,
-        "trailing": true,
-        "undef": true,
-        "unused": true,
-        "maxerr": 100,
-        "eqnull": true,
-        "evil": true,
-        "sub": true,
-        "browser": true,
-        "wsh": true,
-        "predef": [
-          "jQuery",
-          "define",
-          "module",
-        ],
-      },
+        'laxcomma': true
+      }
     },
 
     qunit: {
-      all: ['test/**/*.html'],
+      all: ['test/**/*.html']
     },
 
     watch: {
-      files: "source/**/*",
-      tasks: ["less", "uglify", "rsync:styles", "rsync:scripts"],
-    },
+      files: ['Gruntfile.js', 'source/**/*'],
+      tasks: ['less', 'jshint', 'uglify', 'rsync:styles', 'rsync:scripts']
+    }
 
   });
 
-  grunt.loadNpmTasks("grunt-contrib-coffee");
-  grunt.loadNpmTasks("grunt-contrib-jshint");
-  grunt.loadNpmTasks("grunt-contrib-less");
-  grunt.loadNpmTasks("grunt-contrib-qunit");
-  grunt.loadNpmTasks("grunt-contrib-requirejs");
-  grunt.loadNpmTasks("grunt-contrib-uglify");
-  grunt.loadNpmTasks("grunt-contrib-watch");
-  grunt.loadNpmTasks("grunt-rsync");
+  grunt.loadNpmTasks('grunt-contrib-coffee');
+  grunt.loadNpmTasks('grunt-contrib-jshint');
+  grunt.loadNpmTasks('grunt-contrib-less');
+  grunt.loadNpmTasks('grunt-contrib-qunit');
+  grunt.loadNpmTasks('grunt-contrib-requirejs');
+  grunt.loadNpmTasks('grunt-contrib-uglify');
+  grunt.loadNpmTasks('grunt-contrib-watch');
+  grunt.loadNpmTasks('grunt-rsync');
 
-  grunt.registerTask("default", ["less", "uglify", "rsync:styles", "rsync:scripts"]);
-  grunt.registerTask("test", ["qunit"]);
-}
+  grunt.registerTask('default', ['less', 'uglify', 'rsync:styles', 'rsync:scripts']);
+  grunt.registerTask('test', ['qunit']);
+};
