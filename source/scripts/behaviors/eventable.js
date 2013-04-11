@@ -10,46 +10,105 @@ define('behaviors/eventable', ['skin'], function(skin) {
   // ==================
   // provides event management based on
   // publish, subscribe and unsubscribe model
-  // event are scoped to publishers and namespaces
+  // events are scoped to publishers, emitters and namespaces, paths
+  // the module servers as a shared event bus
 
+  // publisher indices, shared handlers data, cache for fast triggering, reference to adapter helpers
+  var name = 'eventable', indices = [], handlers = {}, cache = {}, adapter = skin.adapter;
 
-  // publisher indices, shared handlers data, reference to adapter helpers
-  var name = 'eventable', indices = [], handlers = {}, adapter = skin.adapter;
-
+  // figure out emitter, path and callback
+  // for on(), once() and off() methods
   function sanitize(args) {
-    var context = this, name, callback;
-    if (!adapter.isString(args[0])) { context = args[0]; args = args.slice(1); }
-    name = adapter.indexFor(indices, context) + (!adapter.isString(args[0]))? '.' + args[0] : '';
-    callback = (!adapter.isFunction(args[0]))? args[0] : args[1];
+    var emitter = this, path, callback = args[args.length - 1];
+    // last argument can be the callback
+    if (adapter.isFunction(callback)) args = args.slice(0, -1);
+    else callback = null;
+    // first argument can be the emitter
+    if (!adapter.isString(args[0])) { emitter = args[0]; args = args.slice(1); }
+    // the rest is path
+    path = adapter.indexFor(indices, emitter) + adapter.isString(args[0]) ? '.' + args[0] : '';
     return {
-      context: context,
-      name: name,
+      emitter: emitter,
+      path: path,
       callback: callback
     };
   }
 
   function on() {
-    var args = sanitize.call(this, adapter.arraySlice.call(arguments, 0));
-    adapter.objectEnsure(handlers, args.name, []);
-    adapter.arrayEnsure(handlers[args.name], args.callback);
-    return this;
+    var context = this
+      , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0));
+    if (adapter.objectHas.call(handlers, args.path)) handlers[args.path] = [];
+    // make sure the same handler is not added again
+    adapter.each(handlers[args.path], function(handler) {
+      if (handler.callback === args.callback && handler.context === context) return this;
+    });
+    handlers[args.path].push({ callback: args.callback, context: context });
+    // check if cache should be cleared
+    if (args.emitter == cache.emitter) cache = {};
+    return context;
   }
 
   function once() {
-    var args = sanitize.call(this, adapter.arraySlice.call(arguments, 0));
-    var callback = function() {
-      args.context.off(args.name, callback);
-      args.callback.apply(args.context, arguments);
-    };
-    on(args.name, callback);
-    return this;
+    var context  = this
+      , args     = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
+      , callback = function() {
+          context.off(args.path, callback);
+          args.callback.apply(context, arguments);
+        };
+    on(args.path, callback);
+    return context;
   }
 
   function off() {
-    var args = sanitize.call(this, adapter.arraySlice.call(arguments, 0));
-    
+    var context = this
+      , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
+      , keys    = adapter.keys(handlers)
+      , index   = adapter.indexFor(indices, args.emitter);
+    // find all handlers with keys starting with path
+    adapter.filter(keys, function(key) { return key.indexOf(args.path) === 0; });
+    // find all callbacks to be removed
+    adapter.each(keys, function(key) {
+      if (args.callback) {
+        adapter.reject(handlers[key], function(handler) {
+          return handler.callback === args.callback;
+        });
+        if (!handlers[key].length) delete handlers[key];
+      } else {
+        delete handlers[key];
+      }
+    });
+    // check if any other handlers available for the emitter
+    // if not, remove the emitter from indices
+    keys = adapter.keys(handlers);
+    adapter.each(keys, function(key) {
+      if (key.indexOf(index) === 0) return this;
+    });
+    adapter.remove(indices, args.emitter);
+    return this;
   }
-  function trigger(object, event) {}
+
+  function trigger(emitter, path, parameters) {
+    var calls = [], keys;
+    if (adapter.isString(emitter)) { parameters = path; path = emitter; emitter = this; }
+    // if its a cached trigger call, no need to find handlers
+    if (emitter == cache.emitter && path == cache.path) calls = cache.handlers;
+    else {
+      cache.emitter = emitter;
+      cache.path = path;
+      path = adapter.indexFor(indices, emitter) + adapter.isString(path) ? '.' + path : '';
+      keys = adapter.keys(handlers);
+      adapter.filter(keys, function(key) {
+        return key.indexOf(path) === 0;
+      });
+      // find all handlers
+      adapter.each(keys, function(key) {
+        calls = calls.concat(handlers[key]);
+      });
+      cache.handlers = calls;
+    }
+    adapter.each(calls, function(handler) { handler.callback.call(handler.context, parameters); });
+    return this;
+  }
 
 
   skin.behaviors[name] = {
@@ -73,6 +132,13 @@ define('behaviors/eventable', ['skin'], function(skin) {
         , constructor = prototype.constructor
         , behaviors   = constructor.behaviors;
       if (!constructor.check(name)) return this;
+      off();
+      delete prototype.on;
+      delete prototype.once;
+      delete prototype.off;
+      delete prototype.trigger;
+      adapter.remove(behaviors, name);
+      return this;
     }
 
 
