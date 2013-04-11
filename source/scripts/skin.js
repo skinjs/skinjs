@@ -11,7 +11,7 @@
   // Private Methods and Properties
   // ==============================
   // existing skin is kept as oldSkin, to be assigned back in noConflict()
-  var context = this, oldSkin = context.skin;
+  var context = this, oldSkin = context.skin, adapter, events, behaviors, skin;
 
 
 
@@ -23,7 +23,7 @@
   // more helpers can be added to adapter later, via AMD or decorators
   // we can also delegate some of these methods to available libraries
   // such as jQuery, Underscore, Zepto etc. via AMD
-  var adapter = {};
+  adapter = {};
 
   adapter.arrays      = Array.prototype;
   adapter.objects     = Object.prototype;
@@ -114,7 +114,7 @@
   // empty namespace to hold behavior modules
   // most common behaviors are defined here,
   // others can be loaded and decorate behaviors later
-  var behaviors = {};
+  behaviors = {};
 
 
 
@@ -127,7 +127,7 @@
   // the module servers as a shared event bus
   // also provides hooks to be added to or removed
   // from component prototypes like other behaviors
-  var events = (function() {
+  events = (function() {
 
     // publisher indices, shared handlers hub, cache for fast triggering, reference to adapter helpers
     var name = 'eventable', indices = [], hub = {}, cache = {};
@@ -228,7 +228,6 @@
       return this;
     }
 
-
     // to use the module as a behavior
     behaviors.eventable = {
 
@@ -262,14 +261,8 @@
     };
 
     // public API
-    return {
+    return { on: on, once: once, off: off, trigger: trigger };
 
-      on: on,
-      once: once,
-      off: off,
-      trigger: trigger
-
-    };
   })();
 
 
@@ -286,8 +279,7 @@
   //          skin(element, name)
   //          skin(element, name, { options... })
   //          skin(element, name).action()
-  var skin = function() {
-    var context = this;
+  skin = function() {
     var args = adapter.arraySlice.call(arguments, 0), element, name, settings;
     // find out what are the arguments
     if (adapter.isElement(args[0])) { element  = args[0]; args = args.slice(1); }
@@ -375,6 +367,9 @@
   skin.events    = events;
   skin.adapter   = adapter;
   skin.behaviors = behaviors;
+
+
+
 
   // export, attach skin to context
   context.skin = skin;
