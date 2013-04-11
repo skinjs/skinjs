@@ -44,7 +44,7 @@ define('behaviors/eventable', ['skin'], function(skin) {
     });
     hub[args.path].push({ callback: args.callback, context: context });
     // check if cache should be cleared
-    if (args.emitter == cache.emitter) cache = {};
+    if (args.emitter === cache.emitter) cache = {};
     return context;
   }
 
@@ -77,6 +77,8 @@ define('behaviors/eventable', ['skin'], function(skin) {
         delete hub[key];
       }
     });
+    // check if cache should be cleared
+    if (args.emitter === cache.emitter) cache = {};
     // check if any other handlers available for the emitter
     // if not, remove the emitter from indices
     keys = adapter.keys(hub);
@@ -91,7 +93,7 @@ define('behaviors/eventable', ['skin'], function(skin) {
     var handlers = [], keys;
     if (adapter.isString(emitter)) { parameters = path; path = emitter; emitter = this; }
     // if its a cached trigger call, no need to find handlers
-    if (emitter == cache.emitter && path == cache.path) handlers = cache.handlers;
+    if (emitter === cache.emitter && path === cache.path) handlers = cache.handlers;
     else {
       cache.emitter = emitter;
       cache.path = path;
