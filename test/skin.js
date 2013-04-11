@@ -1,11 +1,3 @@
-// var pack    = { baseUrl: '../destination/scripts/' }
-//   , modules = ['behaviors/eventable']
-// 
-// QUnit.config.autostart = false
-// require(pack, modules, function() {
-//   QUnit.start()
-// })
-// 
 $(document).ready(function() {
 
   module('skin')
@@ -20,6 +12,11 @@ $(document).ready(function() {
     ok(typeof newSkin === 'function', 'skin is available by a different name')
     window.skin = newSkin
     equal(window.skin, newSkin, 'skin assigned back to global')
+  })
+
+  test('configuration', 1, function() {
+    skin({ pack: { baseUrl: '../destination/scripts/' }})
+    equal(skin.pack.baseUrl, '../destination/scripts/', 'configured settings through skin function')
   })
 
 });

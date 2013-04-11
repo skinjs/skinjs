@@ -143,6 +143,10 @@
           if (skin.behaviors[behavior]) { skin.behaviors[behavior].add.call(components); }
           else skin.require(skin.pack, ['behaviors/' + behavior], function() {
             skin.behaviors[behavior].add.call(components);
+            if (component.behaviors.length == behaviors.length) {
+              if (adapter.isFunction(component.callbacks.ready)) component.callbacks.ready();
+              delete component.ready;
+            }
           });
         });
       };
@@ -150,6 +154,14 @@
       component.isnt = function() {};
       // check if constructor has a behavior
       component.check = function(behavior) { return adapter.inArray(component.behaviors, behavior) != -1; };
+
+      // simple callbacks for ready and change behaviors
+      // the component isn't necessarily eventable, so we need this
+      component.callbacks = {};
+      // ready and change callbacks
+      component.ready  = function(callback) { component.callbacks.ready  = callback; };
+      component.change = function(callback) { component.callbacks.change = callback; };
+
       // return the product
       return component;
     }
