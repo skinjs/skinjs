@@ -3,7 +3,15 @@
 // skin.js may be freely distributed under the MIT license
 // http://skinjs.org
 
-define('skin', function() {
+(function() {
+
+
+
+
+  // Private Methods and Properties
+  // ==============================
+  // existing skin is kept as oldSkin, to be assigned back in noConflict()
+  var context = this, oldSkin = context.skin;
 
 
 
@@ -14,7 +22,7 @@ define('skin', function() {
   // basic helpers are added here to be used in this context
   // more helpers can be added to adapter later, via AMD or decorators
   // we can also delegate some of these methods to available libraries
-  // such as jQuery, Underscore, Zepto etc.
+  // such as jQuery, Underscore, Zepto etc. via AMD
   var adapter = {};
 
   adapter.arrays      = Array.prototype;
@@ -41,6 +49,22 @@ define('skin', function() {
     }
   };
 
+  // basic filter function
+  // this can be overridden by a sophisticated version later, via AMD
+  adapter.filter = function(array, iterator, context) {
+    for (var index = array.length - 1; index >= 0; index--) {
+      if (!iterator.call(context || this, array[index], index, array)) array.splice(index, 1);
+    }
+  };
+
+  // basic reject function
+  // this can be overridden by a sophisticated version later, via AMD
+  adapter.reject = function(array, iterator, context) {
+    for (var index = array.length - 1; index >= 0; index--) {
+      if (iterator.call(context || this, array[index], index, array)) array.splice(index, 1);
+    }
+  };
+
   // recursive extend, also removes a property from target if it is explicitly set to undefined in source
   adapter.extend = function(target) {
     adapter.each(adapter.arraySlice.call(arguments, 1), function(source) {
@@ -56,6 +80,19 @@ define('skin', function() {
   // make it easier to support IE8 in future
   adapter.inArray = function(array, item, index) { return adapter.arrays.indexOf.call(array, item, index); };
 
+  // basic remove function, removes an item from array
+  // this can be overridden by a sophisticated version later, via AMD
+  adapter.remove = function(array, item) {
+    array.splice(adapter.inArray(array, item), 1);
+  };
+
+  // get array of keys in an object
+  adapter.keys = Object.keys || function(object) {
+    var keys = [];
+    for (var key in object) if (adapter.objectHas.call(object, key)) keys.push(key);
+    return keys;
+  };
+
   // helper for indexing elements
   // adds item, if not exists, at the first empty index
   // returns the index of item
@@ -69,96 +106,52 @@ define('skin', function() {
     return empty;
   };
 
-  // push item into array if not exists
-  adapter.arrayEnsure = function(array, item) {
-    if (adapter.inArray(array, item) == -1) array.push(item);
-    return item;
-  };
-
-  // add default value into object if not exists
-  adapter.objectEnsure = function(object, key, value) {
-    if (!adapter.objectHas.call(object, key)) object[key] = value;
-    return value;
-  };
 
 
 
-
-  // Private Methods and Properties
-  // ==============================
-  // shortcuts and references
-  // existing skin is kept as oldSkin, to be assigned back in noConflict()
-  var context = this, oldSkin = context.skin, queue = [], settings, initialized, skin, hub;
-
-  // queue calls until initialize is done, or core or required modules are loaded
-  function enqueue(callback, args, context) { queue.unshift([callback, args, context]); }
-
-  // try to execute queued calls
-  function dequeue() {
-    var count, succeed;
-    for (count = queue.length; count >= 0; count--) {
-      succeed = true;
-      try { queue[count][0].apply(queue[count][2] || this, queue[count][1]); }
-      catch(exception) { succeed = false; }
-      finally { if (succeed) queue.splice(count, 1); }
-    }
-  }
-
-  // initialize skin
-  function initialize() {
-    initialized = false;
-    // TODO: implement jQuery, Zepto, Underscore and Backbone versions of adapter
-    //       detect which library is available, then load a specific adapter
-    load(['adapter', 'hub', 'base'], function() {
-      // assign hub
-      hub = skin.hub;
-      // TODO: implement skin.ready() using events
-      initialized = true;
-    });
-  }
-
-  // load modules, invoke callback
-  function load(modules, callback, args, context) {
-    var module;
-    settings.require(settings.pack, modules, function() {
-      for (var count in modules) {
-        module = modules[count];
-      }
-      if (adapter.isFunction(callback)) callback.apply(context || this, args);
-      // try dequeue
-      dequeue();
-    });
-  }
-
-
-
-
-  // Main Skin Function and Namespace
-  // ================================
+  // Skin Factory and Namespace
+  // ==========================
+  // can configure skin's settings
+  // or create and return skeleton for skin components
+  // which can manage their behaviors, at class level
   // example: skin({ options... })
   //          skin(name)
   //          skin(element)
   //          skin(element, name)
   //          skin(element, name, { options... })
   //          skin(element, name).action()
-  skin = function() {
-    var args = adapter.arraySlice.call(arguments, 0), element, name, options;
-    // assign default settings
-    if (!settings) settings = skin.defaults;
+  var skin = function() {
+    var args = adapter.arraySlice.call(arguments, 0), element, name, settings;
     // find out what are the arguments
-    if (adapter.isElement(args[0])) { element = args[0]; args = args.slice(1); }
-    if (adapter.isString(args[0]))  { name    = args[0]; args = args.slice(1); }
-    if (adapter.isObject(args[0]))  { options = args[0]; }
-    // check if only options object is available, configure skin itself
+    if (adapter.isElement(args[0])) { element  = args[0]; args = args.slice(1); }
+    if (adapter.isString(args[0]))  { name     = args[0]; args = args.slice(1); }
+    if (adapter.isObject(args[0]))  { settings = args[0]; }
+    // check if only settings object is available, configure skin itself
     // this way we can configure require, preload and pack before initialize or loading any other module
-    if (options && !element && !name) adapter.extend(settings, options);
-    // if skin hasn't been initialized yet, queue the request and initialize
-    else if (!initialized) {
-      enqueue(skin, args, this);
-      // ensure initialize function runs only once
-      if (initialized === undefined) initialize();
+    if (settings && !element && !name) {
+      adapter.extend(skin, settings);
+      return skin;
     } else {
-      // TODO: get or create skin
+      var component  = function() {}
+        , components = component.prototype;
+      // component's behaviors
+      component.behaviors = [];
+      // method to add behaviors to the constructor
+      component.is = function() {
+        var args = arguments, behaviors = adapter.isArray(args[0])? args[0] : adapter.arraySlice.call(args, 0);
+        adapter.each(behaviors, function(behavior) {
+          if (skin.behaviors[behavior]) { skin.behaviors[behavior].add.call(components); }
+          else skin.require(skin.pack, ['behaviors/' + behavior], function() {
+            skin.behaviors[behavior].add.call(components);
+          });
+        });
+      };
+      // method to remove behaviors from the constructor
+      component.isnt = function() {};
+      // check if constructor has a behavior
+      component.check = function(behavior) { return adapter.inArray(component.behaviors, behavior) != -1; };
+      // return the product
+      return component;
     }
   };
 
@@ -169,34 +162,28 @@ define('skin', function() {
   // =============================
   // version
   skin.version = '0.1.3';
-  // default settings
-  skin.defaults = {
-    // name, used for plugins, unique id prefix etc.
-    alias: 'skin',
-    // automatically create plugins for jQuery, Zepto etc.
-    plugin: true,
-    // modules which should be preloaded, for fast invokation
-    preload: [],
-    // require options, base url, paths
-    pack: {},
-    // default method for asynchronously loading modules
-    // using define() module definition, proposed by CommonJS
-    // for Asynchronous Module Definition (AMD)
-    // require.js or curl.js should be available, otherwise users should
-    // implement or adapt their own loader and assign it to skin through settings
-    // example: skin({ require: function(package, modules, callback) { implementation... }})
-    require: context.require || context.curl
-  };
 
+  // name, used for plugins, unique id prefix etc.
+  skin.alias = 'skin';
 
+  // automatically create plugins for jQuery, Zepto etc.
+  skin.plugin = true;
 
+  // modules which should be preloaded, for fast invokation
+  skin.preload = [];
+
+  // require options, base url, paths
+  skin.pack = {};
+
+  // delegate method for asynchronously loading modules
+  // using define() module definition, proposed by CommonJS
+  // for Asynchronous Module Definition (AMD)
+  // require.js or curl.js should be available
+  skin.require = context.require || context.curl;
 
   // assign cached skin back and return this object
   // example: var newSkin = skin.noConflict()
   skin.noConflict = function() { context.skin = oldSkin; return this; };
-
-  // method used in extension modules to add templates, actions and recipes
-  skin.set = function(data) { if (hub) hub.set(data); else enqueue(skin.set, [data]); };
 
 
 
@@ -209,42 +196,10 @@ define('skin', function() {
 
 
 
-  // Component Factory
-  // =================
-  // create and return skeleton for skin components
-  // which can manage their behaviors, at class level
-  var factory = skin.factory = function() {
-    // assign default settings
-    if (!settings) settings = skin.defaults;
-    var component  = function() {}
-      , components = component.prototype;
-    // component's behaviors
-    component.behaviors = [];
-    // method to add behaviors to the constructor
-    component.is = function() {
-      var args = arguments, behaviors = adapter.isArray(args[0])? args[0] : adapter.arraySlice.call(args, 0);
-      adapter.each(behaviors, function(behavior) {
-        if (skin.behaviors[behavior]) { skin.behaviors[behavior].add.call(components); }
-        else settings.require(settings.pack, ['behaviors/' + behavior], function() {
-          skin.behaviors[behavior].add.call(components);
-        });
-      });
-    };
-    // method to remove behaviors from the constructor
-    component.isnt = function() {};
-    // check if constructor has a behavior
-    component.check = function(behavior) { return adapter.inArray(component.behaviors, behavior) != -1; };
-    // return the product
-    return component;
-  };
-
-
-
-
-  // attach modules to skin, make them available everywhere
+  // attach adapter to skin, make it available everywhere
   skin.adapter = adapter;
 
-  // export, attach skin to context, this or window
+  // export, attach skin to context
   context.skin = skin;
-  return skin;
-});
+  if (adapter.isFunction(define) && define.amd) define('skin', function() { return skin; });
+}).call(this);

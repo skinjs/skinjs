@@ -1,17 +1,17 @@
-var pack    = { baseUrl: '../destination/scripts/' }
-  , modules = ['adapter', 'hub']
-
-QUnit.config.autostart = false
-require(pack, modules, function() {
-  QUnit.start()
-})
-
+// var pack    = { baseUrl: '../destination/scripts/' }
+//   , modules = ['behaviors/eventable']
+// 
+// QUnit.config.autostart = false
+// require(pack, modules, function() {
+//   QUnit.start()
+// })
+// 
 $(document).ready(function() {
 
   module('skin')
 
   test('availability', 1, function() {
-    ok(window.skin === skin && typeof skin === 'function', 'skin function is available');
+    ok(window.skin === skin && typeof skin === 'function', 'skin is available');
   })
 
   test('avoiding conflicts', 3, function() {

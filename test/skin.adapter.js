@@ -1,6 +1,6 @@
 $(document).ready(function() {
 
-  module('adapter')
+  module('skin: adapter')
 
   var adapter
 
@@ -11,8 +11,8 @@ $(document).ready(function() {
 
   test('shortcuts', 4, function() {
     adapter = skin.adapter
-    ok(adapter.Objects === Object.prototype, 'object prototype')
-    ok(adapter.Arrays === Array.prototype, 'array prototype')
+    ok(adapter.objects === Object.prototype, 'object prototype')
+    ok(adapter.arrays === Array.prototype, 'array prototype')
     ok(adapter.arraySlice === Array.prototype.slice, 'array slice')
     ok(adapter.objectHas === Object.prototype.hasOwnProperty, 'object has own property')
   })
@@ -59,6 +59,27 @@ $(document).ready(function() {
     ok(!adapter.isElement(object), 'object is not element')
     ok(!adapter.isElement(null), 'null is not element')
     ok(!adapter.isElement(), 'undefined is not element')
+  })
+
+  test('each', 2, function() {
+    adapter = skin.adapter
+    var array  = [1, 2, 3, null, 4]
+      , object = { a: 1, b: { c: true }, d: undefined, e: null, f: 'foo', g: [1, 2, 3] }
+      , count  = 0
+    adapter.each(array, function(item) { if (item) count += item })
+    equal(count, 10, 'iterated through array')
+    count = 0
+    adapter.each(object, function(item) { count++ })
+    equal(count, 6, 'iterated through object')
+  })
+
+  test('basic filter and reject', 2, function() {
+    adapter = skin.adapter
+    var array  = [1, 2, 3, 4, 5, 'a', 'b', 'c', 'foo', 'bar', 'z'];
+    adapter.filter(array, function(item) { return typeof item === 'string' });
+    equal(array.length, 6, 'basic filter function applied to array')
+    adapter.reject(array, function(item) { return item.length > 1 });
+    equal(array.length, 4, 'basic reject function applied to array')
   })
 
   test('object keys', 2, function() {

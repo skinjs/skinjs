@@ -74,6 +74,7 @@ module.exports = function(grunt) {
         'undef': true,
         //'unused': true,
         'globals': {
+          'window': false,
           'console': false,
           'module': false,
           'define': false,
