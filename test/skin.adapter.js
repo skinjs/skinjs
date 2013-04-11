@@ -6,7 +6,7 @@ $(document).ready(function() {
 
   test('availability', 1, function() {
     adapter = skin.adapter
-    ok(adapter != undefined, 'skin adapter is available')
+    ok(adapter != undefined, 'skin adapter module is available')
   })
 
   test('shortcuts', 4, function() {

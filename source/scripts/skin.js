@@ -109,6 +109,172 @@
 
 
 
+  // Skin Behaviors Module
+  // =====================
+  // empty namespace to hold behavior modules
+  // most common behaviors are defined here,
+  // others can be loaded and decorate behaviors later
+  var behaviors = {};
+
+
+
+
+  // Events Module & Eventable Behavior
+  // ==================================
+  // provides event management system based on
+  // publish, subscribe and unsubscribe model
+  // events are scoped to emitters and paths
+  // the module servers as a shared event bus
+  // also provides hooks to be added to or removed
+  // from component prototypes like other behaviors
+  var events = (function() {
+
+    // publisher indices, shared handlers hub, cache for fast triggering, reference to adapter helpers
+    var name = 'eventable', indices = [], hub = {}, cache = {};
+
+    // figure out emitter, path and callback
+    // for on(), once() and off() methods
+    function sanitize(args) {
+      var emitter = this, path, callback = args[args.length - 1];
+      // last argument can be the callback
+      if (adapter.isFunction(callback)) args = args.slice(0, -1);
+      else callback = null;
+      // first argument can be the emitter
+      if (!adapter.isString(args[0])) { emitter = args[0]; args = args.slice(1); }
+      // the rest is path
+      path = adapter.indexFor(indices, emitter) + (adapter.isString(args[0]) ? '.' + args[0] : '');
+      return {
+        emitter: emitter,
+        path: path,
+        callback: callback
+      };
+    }
+
+    function on() {
+      var context = this
+        , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0));
+      if (!adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
+      // make sure the same handler is not added again
+      adapter.each(hub[args.path], function(handler) {
+        if (handler.callback === args.callback && handler.context === context) return this;
+      });
+      hub[args.path].push({ callback: args.callback, context: context });
+      // check if cache should be cleared
+      if (args.emitter === cache.emitter) cache = {};
+      return context;
+    }
+
+    function once() {
+      var context  = this
+        , args     = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
+        , callback = function() {
+          context.off(args.path, callback);
+          args.callback.apply(context, arguments);
+        };
+      on(args.path, callback);
+      return context;
+    }
+
+    function off() {
+      var context = this
+        , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
+        , keys    = adapter.keys(hub)
+        , index   = adapter.indexFor(indices, args.emitter);
+      // find all handlers with keys starting with path
+      adapter.filter(keys, function(key) { return key.indexOf(args.path) === 0; });
+      // find all callbacks to be removed
+      adapter.each(keys, function(key) {
+        if (args.callback) {
+          adapter.reject(hub[key], function(handler) {
+            return handler.callback === args.callback;
+          });
+          if (!hub[key].length) delete hub[key];
+        } else {
+          delete hub[key];
+        }
+      });
+      // check if cache should be cleared
+      if (args.emitter === cache.emitter) cache = {};
+      // check if any other handlers available for the emitter
+      // if not, remove the emitter from indices
+      keys = adapter.keys(hub);
+      adapter.each(keys, function(key) {
+        if (key.indexOf(index) === 0) return this;
+      });
+      adapter.remove(indices, args.emitter);
+      return this;
+    }
+
+    function trigger(emitter, path, parameters) {
+      var handlers = [], keys;
+      if (adapter.isString(emitter)) { parameters = path; path = emitter; emitter = this; }
+      // if its a cached trigger call, no need to find handlers
+      if (emitter === cache.emitter && path === cache.path) handlers = cache.handlers;
+      else {
+        cache.emitter = emitter;
+        cache.path = path;
+        path = adapter.indexFor(indices, emitter) + (adapter.isString(path) ? '.' + path : '');
+        keys = adapter.keys(hub);
+        adapter.filter(keys, function(key) {
+          return key.indexOf(path) === 0;
+        });
+        // find all handlers
+        adapter.each(keys, function(key) {
+          handlers = handlers.concat(hub[key]);
+        });
+        cache.handlers = handlers;
+      }
+      adapter.each(handlers, function(handler) { handler.callback.call(handler.context, parameters); });
+      return this;
+    }
+
+
+    // to use the module as a behavior
+    behaviors.eventable = {
+
+      add: function() {
+        var prototype   = this
+          , constructor = prototype.constructor
+          , behaviors   = constructor.behaviors;
+        if (constructor.check(name)) return this;
+        prototype.on      = on;
+        prototype.once    = once;
+        prototype.off     = off;
+        prototype.trigger = trigger;
+        if (behaviors) behaviors.push(name);
+        return this;
+      },
+
+      remove: function() {
+        var prototype   = this
+          , constructor = prototype.constructor
+          , behaviors   = constructor.behaviors;
+        if (!constructor.check(name)) return this;
+        off();
+        delete prototype.on;
+        delete prototype.once;
+        delete prototype.off;
+        delete prototype.trigger;
+        adapter.remove(behaviors, name);
+        return this;
+      }
+
+    };
+
+    // public API
+    return {
+
+      on: on,
+      once: once,
+      off: off,
+      trigger: trigger
+
+    };
+  })();
+
+
+
+
   // Skin Factory and Namespace
   // ==========================
   // can configure skin's settings
@@ -121,6 +287,7 @@
   //          skin(element, name, { options... })
   //          skin(element, name).action()
   var skin = function() {
+    var context = this;
     var args = adapter.arraySlice.call(arguments, 0), element, name, settings;
     // find out what are the arguments
     if (adapter.isElement(args[0])) { element  = args[0]; args = args.slice(1); }
@@ -140,12 +307,18 @@
       component.is = function() {
         var args = arguments, behaviors = adapter.isArray(args[0])? args[0] : adapter.arraySlice.call(args, 0);
         adapter.each(behaviors, function(behavior) {
-          if (skin.behaviors[behavior]) { skin.behaviors[behavior].add.call(components); }
+          if (skin.behaviors[behavior]) {
+            skin.behaviors[behavior].add.call(components);
+            //skin.trigger('change');
+            if (component.behaviors.length == behaviors.length) {
+              //skin.trigger('ready');
+            }
+          }
           else skin.require(skin.pack, ['behaviors/' + behavior], function() {
             skin.behaviors[behavior].add.call(components);
+            //skin.trigger('change');
             if (component.behaviors.length == behaviors.length) {
-              if (adapter.isFunction(component.callbacks.ready)) component.callbacks.ready();
-              delete component.ready;
+              //skin.trigger('ready');
             }
           });
         });
@@ -154,14 +327,6 @@
       component.isnt = function() {};
       // check if constructor has a behavior
       component.check = function(behavior) { return adapter.inArray(component.behaviors, behavior) != -1; };
-
-      // simple callbacks for ready and change behaviors
-      // the component isn't necessarily eventable, so we need this
-      component.callbacks = {};
-      // ready and change callbacks
-      component.ready  = function(callback) { component.callbacks.ready  = callback; };
-      component.change = function(callback) { component.callbacks.change = callback; };
-
       // return the product
       return component;
     }
@@ -197,21 +362,21 @@
   // example: var newSkin = skin.noConflict()
   skin.noConflict = function() { context.skin = oldSkin; return this; };
 
-
-
-
-  // Skin Behaviors Module
-  // =====================
-  // empty namespace to be decorated by behavior definitions
-  skin.behaviors = {};
+  // make skin eventable
+  skin({ on:      events.on,
+         once:    events.once,
+         off:     events.off,
+         trigger: events.trigger });
 
 
 
 
-  // attach adapter to skin, make it available everywhere
-  skin.adapter = adapter;
+  // attach modules to skin, make them available everywhere
+  skin.events    = events;
+  skin.adapter   = adapter;
+  skin.behaviors = behaviors;
 
   // export, attach skin to context
   context.skin = skin;
-  if (adapter.isFunction(define) && define.amd) define('skin', function() { return skin; });
+  if (adapter.isFunction(define) && define.amd) define('skin', skin);
 }).call(this);
