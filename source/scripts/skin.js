@@ -1,4 +1,4 @@
-// skin.js 0.1.2
+// skin.js 0.1.3
 // © 2013 Soheil Jadidian
 // skin.js may be freely distributed under the MIT license
 // http://skinjs.org
@@ -8,49 +8,125 @@ define('skin', function() {
 
 
 
+  // Skin JavaScript Adapter Module
+  // ==============================
+  // provides helpers and shortcuts to be used everywhere
+  // basic helpers are added here to be used in this context
+  // more helpers can be added to adapter later, via AMD or decorators
+  // we can also delegate some of these methods to available libraries
+  // such as jQuery, Underscore, Zepto etc.
+  var adapter = {};
+
+  adapter.arrays      = Array.prototype;
+  adapter.objects     = Object.prototype;
+  adapter.arraySlice  = adapter.arrays.slice;
+  adapter.objectHas   = adapter.objects.hasOwnProperty;
+
+  adapter.isArray     = function(symbol) { return symbol && (symbol.isArray || symbol instanceof Array); };
+  adapter.isObject    = function(symbol) { return symbol && typeof(symbol) === 'object' && !adapter.isArray(symbol); };
+  adapter.isElement   = function(symbol) { return symbol && symbol.nodeType == 1; };
+  adapter.isString    = function(symbol) { return typeof(symbol) === 'string'; };
+  adapter.isFunction  = function(symbol) { return typeof(symbol) === 'function'; };
+  adapter.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; };
+  adapter.isUndefined = function(symbol) { return symbol === undefined; };
+
+  // iterator, breaks if any iteration returns false
+  adapter.each = function(symbol, iterator, context) {
+    if (adapter.isArray(symbol)) for (var index = 0; index < symbol.length; index++) {
+      if (iterator.call(context, symbol[index], index, symbol) === false) return;
+    } else if (adapter.isObject(symbol)) for (var key in symbol) {
+      if (adapter.objectHas.call(symbol, key)) {
+        if (iterator.call(context, symbol[key], key, symbol) === false) return;
+      }
+    }
+  };
+
+  // recursive extend, also removes a property from target if it is explicitly set to undefined in source
+  adapter.extend = function(target) {
+    adapter.each(adapter.arraySlice.call(arguments, 1), function(source) {
+      for (var key in source) {
+        if (adapter.isUndefined(source[key]) && target[key]) delete target[key];
+        else if (adapter.isObject(source[key]) && adapter.isObject(target[key])) adapter.extend(target[key], source[key]);
+        else target[key] = source[key];
+      }
+    });
+    return target;
+  };
+
+  // make it easier to support IE8 in future
+  adapter.inArray = function(array, item, index) { return adapter.arrays.indexOf.call(array, item, index); };
+
+  // helper for indexing elements
+  // adds item, if not exists, at the first empty index
+  // returns the index of item
+  adapter.indexFor = function(array, item) {
+    var empty = array.length;
+    for (var index = 0; index < array.length; index++) {
+      if (array[index] === item) return index;
+      if (array[index] === undefined) empty = index;
+    }
+    array[empty] = item;
+    return empty;
+  };
+
+  // push item into array if not exists
+  adapter.arrayEnsure = function(array, item) {
+    if (adapter.inArray(array, item) == -1) array.push(item);
+    return item;
+  };
+
+  // add default value into object if not exists
+  adapter.objectEnsure = function(object, key, value) {
+    if (!adapter.objectHas.call(object, key)) object[key] = value;
+    return value;
+  };
+
+
+
+
   // Private Methods and Properties
   // ==============================
   // shortcuts and references
   // existing skin is kept as oldSkin, to be assigned back in noConflict()
-  var _context = this, _oldSkin = _context.skin, _queue = [], _settings, _initialized, _skin, _adapter, _hub;
+  var context = this, oldSkin = context.skin, queue = [], settings, initialized, skin, hub;
 
   // queue calls until initialize is done, or core or required modules are loaded
-  function _enqueue(callback, args, context) { _queue.unshift([callback, args, context]); }
+  function enqueue(callback, args, context) { queue.unshift([callback, args, context]); }
 
   // try to execute queued calls
-  function _dequeue() {
+  function dequeue() {
     var count, succeed;
-    for (count = _queue.length; count >= 0; count--) {
+    for (count = queue.length; count >= 0; count--) {
       succeed = true;
-      try { _queue[count][0].apply(_queue[count][2] || this, _queue[count][1]); }
+      try { queue[count][0].apply(queue[count][2] || this, queue[count][1]); }
       catch(exception) { succeed = false; }
-      finally { if (succeed) _queue.splice(count, 1); }
+      finally { if (succeed) queue.splice(count, 1); }
     }
   }
 
   // initialize skin
-  function _initialize() {
-    _initialized = false;
+  function initialize() {
+    initialized = false;
     // TODO: implement jQuery, Zepto, Underscore and Backbone versions of adapter
     //       detect which library is available, then load a specific adapter
-    _load(['adapter', 'hub', 'base'], function() {
+    load(['adapter', 'hub', 'base'], function() {
       // assign hub
-      _hub = _skin.hub;
+      hub = skin.hub;
       // TODO: implement skin.ready() using events
-      _initialized = true;
+      initialized = true;
     });
   }
 
   // load modules, invoke callback
-  function _load(modules, callback, args, context) {
+  function load(modules, callback, args, context) {
     var module;
-    _settings.require(_settings.pack, modules, function() {
+    settings.require(settings.pack, modules, function() {
       for (var count in modules) {
         module = modules[count];
       }
-      if (_adapter.isFunction(callback)) callback.apply(context || this, args);
+      if (adapter.isFunction(callback)) callback.apply(context || this, args);
       // try dequeue
-      _dequeue();
+      dequeue();
     });
   }
 
@@ -65,24 +141,24 @@ define('skin', function() {
   //          skin(element, name)
   //          skin(element, name, { options... })
   //          skin(element, name).action()
-  _skin = function() {
-    var args = _adapter.arraySlice.call(arguments, 0), element, name, options;
+  skin = function() {
+    var args = adapter.arraySlice.call(arguments, 0), element, name, options;
     // assign default settings
-    if (!_settings) _settings = skin.defaults;
+    if (!settings) settings = skin.defaults;
     // find out what are the arguments
-    if (_adapter.isElement(args[0])) { element = args[0]; args = args.slice(1); }
-    if (_adapter.isString(args[0]))  { name    = args[0]; args = args.slice(1); }
-    if (_adapter.isObject(args[0]))  { options = args[0]; }
+    if (adapter.isElement(args[0])) { element = args[0]; args = args.slice(1); }
+    if (adapter.isString(args[0]))  { name    = args[0]; args = args.slice(1); }
+    if (adapter.isObject(args[0]))  { options = args[0]; }
     // check if only options object is available, configure skin itself
     // this way we can configure require, preload and pack before initialize or loading any other module
-    if (options && !element && !name) _adapter.extend(true, _settings, options);
+    if (options && !element && !name) adapter.extend(settings, options);
     // if skin hasn't been initialized yet, queue the request and initialize
-    else if (!_initialized) {
-      _enqueue(_skin, args, this);
+    else if (!initialized) {
+      enqueue(skin, args, this);
       // ensure initialize function runs only once
-      if (_initialized === undefined) _initialize();
+      if (initialized === undefined) initialize();
     } else {
-      // get or create skin
+      // TODO: get or create skin
     }
   };
 
@@ -92,9 +168,9 @@ define('skin', function() {
   // Static Methods and Properties
   // =============================
   // version
-  _skin.version = '0.1.2';
+  skin.version = '0.1.3';
   // default settings
-  _skin.defaults = {
+  skin.defaults = {
     // name, used for plugins, unique id prefix etc.
     alias: 'skin',
     // automatically create plugins for jQuery, Zepto etc.
@@ -109,63 +185,66 @@ define('skin', function() {
     // require.js or curl.js should be available, otherwise users should
     // implement or adapt their own loader and assign it to skin through settings
     // example: skin({ require: function(package, modules, callback) { implementation... }})
-    require: _context.require || _context.curl
+    require: context.require || context.curl
   };
+
+
+
 
   // assign cached skin back and return this object
   // example: var newSkin = skin.noConflict()
-  _skin.noConflict = function() { _context.skin = _oldSkin; return this; };
+  skin.noConflict = function() { context.skin = oldSkin; return this; };
 
   // method used in extension modules to add templates, actions and recipes
-  _skin.set = function(data) { if (_hub) _hub.set(data); else _enqueue(_skin.set, [data]); };
+  skin.set = function(data) { if (hub) hub.set(data); else enqueue(skin.set, [data]); };
 
 
 
 
-  // Skin JavaScript Adapter Module
-  // ==============================
-  // basic helpers, under adapter namespace
-  _adapter = _skin.adapter = {};
+  // Skin Behaviors Module
+  // =====================
+  // empty namespace to be decorated by behavior definitions
+  skin.behaviors = {};
 
-  _adapter.Objects     = Object.prototype;
-  _adapter.Arrays      = Array.prototype;
-  _adapter.arraySlice  = _adapter.Arrays.slice;
-  _adapter.objectHas   = _adapter.Objects.hasOwnProperty;
-  _adapter.isArray     = function(symbol) { return symbol && (symbol.isArray || symbol instanceof Array); };
-  _adapter.isString    = function(symbol) { return typeof(symbol) === 'string'; };
-  _adapter.isFunction  = function(symbol) { return typeof(symbol) === 'function'; };
-  _adapter.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; };
-  _adapter.isUndefined = function(symbol) { return typeof(symbol) === 'undefined'; };
-  _adapter.isObject    = function(symbol) { return symbol && typeof(symbol) === 'object' && !_adapter.isArray(symbol); };
-  _adapter.isElement   = function(symbol) { return symbol && symbol.nodeType == Node.ELEMENT_NODE; };
 
-  // extend an array or object, remove undefined keys
-  // we need this for merging skin options, before other adapter methods are loaded
-  // example: extend(recursive, target, source)
-  //          extend({ adapter... })
-  _adapter.extend = function() {
-    var args = _adapter.arraySlice.call(arguments, 0), recursive = true, target, source;
-    // last argument is always the source
-    source = args.slice(-1)[0];
-    args = args.slice(0, -1);
-    // if first argument is boolean, its recursive flag
-    if (_adapter.isBoolean(args[0])) { recursive = args[0]; args = args.slice(1); }
-    // if there's no target, extend adapter itself
-    target = (args.length)? args[0] : _adapter;
-    for (var key in source) {
-      if (recursive && (_adapter.isObject(source[key]) || _adapter.isArray(source[key]))) {
-        if (_adapter.isObject(source[key]) && !_adapter.isObject(target[key])) target[key] = {};
-        if (_adapter.isArray(source[key])  && !_adapter.isArray(target[key]))  target[key] = [];
-        _adapter.extend(recursive, target[key], source[key]);
-      }
-      else if (source[key] !== undefined) target[key] = source[key];
-      else if (target[key]) delete target[key];
-    }
+
+
+  // Component Factory
+  // =================
+  // create and return skeleton for skin components
+  // which can manage their behaviors, at class level
+  var factory = skin.factory = function() {
+    // assign default settings
+    if (!settings) settings = skin.defaults;
+    var component  = function() {}
+      , components = component.prototype;
+    // component's behaviors
+    component.behaviors = [];
+    // method to add behaviors to the constructor
+    component.is = function() {
+      var args = arguments, behaviors = adapter.isArray(args[0])? args[0] : adapter.arraySlice.call(args, 0);
+      adapter.each(behaviors, function(behavior) {
+        if (skin.behaviors[behavior]) { skin.behaviors[behavior].add.call(components); }
+        else settings.require(settings.pack, ['behaviors/' + behavior], function() {
+          skin.behaviors[behavior].add.call(components);
+        });
+      });
+    };
+    // method to remove behaviors from the constructor
+    component.isnt = function() {};
+    // check if constructor has a behavior
+    component.check = function(behavior) { return adapter.inArray(component.behaviors, behavior) != -1; };
+    // return the product
+    return component;
   };
 
 
 
 
-  _context.skin = _skin;
-  return _skin;
+  // attach modules to skin, make them available everywhere
+  skin.adapter = adapter;
+
+  // export, attach skin to context, this or window
+  context.skin = skin;
+  return skin;
 });

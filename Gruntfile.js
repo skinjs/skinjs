@@ -70,7 +70,16 @@ module.exports = function(grunt) {
     jshint: {
       files: ['Gruntfile.js', 'source/**/*.js'],
       options: {
-        'laxcomma': true
+        'laxcomma': true,
+        'undef': true,
+        //'unused': true,
+        'globals': {
+          'console': false,
+          'module': false,
+          'define': false,
+          'require': false,
+          'curl': false
+        }
       }
     },
 
