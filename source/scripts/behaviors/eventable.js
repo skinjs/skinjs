@@ -13,8 +13,8 @@ define('behaviors/eventable', ['skin'], function(skin) {
   // events are scoped to publishers, emitters and namespaces, paths
   // the module servers as a shared event bus
 
-  // publisher indices, shared handlers data, cache for fast triggering, reference to adapter helpers
-  var name = 'eventable', indices = [], handlers = {}, cache = {}, adapter = skin.adapter;
+  // publisher indices, shared handlers hub, cache for fast triggering, reference to adapter helpers
+  var name = 'eventable', indices = [], hub = {}, cache = {}, adapter = skin.adapter;
 
   // figure out emitter, path and callback
   // for on(), once() and off() methods
@@ -37,12 +37,12 @@ define('behaviors/eventable', ['skin'], function(skin) {
   function on() {
     var context = this
       , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0));
-    if (adapter.objectHas.call(handlers, args.path)) handlers[args.path] = [];
+    if (adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
     // make sure the same handler is not added again
-    adapter.each(handlers[args.path], function(handler) {
+    adapter.each(hub[args.path], function(handler) {
       if (handler.callback === args.callback && handler.context === context) return this;
     });
-    handlers[args.path].push({ callback: args.callback, context: context });
+    hub[args.path].push({ callback: args.callback, context: context });
     // check if cache should be cleared
     if (args.emitter == cache.emitter) cache = {};
     return context;
@@ -62,24 +62,24 @@ define('behaviors/eventable', ['skin'], function(skin) {
   function off() {
     var context = this
       , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
-      , keys    = adapter.keys(handlers)
+      , keys    = adapter.keys(hub)
       , index   = adapter.indexFor(indices, args.emitter);
     // find all handlers with keys starting with path
     adapter.filter(keys, function(key) { return key.indexOf(args.path) === 0; });
     // find all callbacks to be removed
     adapter.each(keys, function(key) {
       if (args.callback) {
-        adapter.reject(handlers[key], function(handler) {
+        adapter.reject(hub[key], function(handler) {
           return handler.callback === args.callback;
         });
-        if (!handlers[key].length) delete handlers[key];
+        if (!hub[key].length) delete hub[key];
       } else {
-        delete handlers[key];
+        delete hub[key];
       }
     });
     // check if any other handlers available for the emitter
     // if not, remove the emitter from indices
-    keys = adapter.keys(handlers);
+    keys = adapter.keys(hub);
     adapter.each(keys, function(key) {
       if (key.indexOf(index) === 0) return this;
     });
@@ -88,25 +88,25 @@ define('behaviors/eventable', ['skin'], function(skin) {
   }
 
   function trigger(emitter, path, parameters) {
-    var calls = [], keys;
+    var handlers = [], keys;
     if (adapter.isString(emitter)) { parameters = path; path = emitter; emitter = this; }
     // if its a cached trigger call, no need to find handlers
-    if (emitter == cache.emitter && path == cache.path) calls = cache.handlers;
+    if (emitter == cache.emitter && path == cache.path) handlers = cache.handlers;
     else {
       cache.emitter = emitter;
       cache.path = path;
       path = adapter.indexFor(indices, emitter) + adapter.isString(path) ? '.' + path : '';
-      keys = adapter.keys(handlers);
+      keys = adapter.keys(hub);
       adapter.filter(keys, function(key) {
         return key.indexOf(path) === 0;
       });
       // find all handlers
       adapter.each(keys, function(key) {
-        calls = calls.concat(handlers[key]);
+        handlers = handlers.concat(hub[key]);
       });
-      cache.handlers = calls;
+      cache.handlers = handlers;
     }
-    adapter.each(calls, function(handler) { handler.callback.call(handler.context, parameters); });
+    adapter.each(handlers, function(handler) { handler.callback.call(handler.context, parameters); });
     return this;
   }
 
