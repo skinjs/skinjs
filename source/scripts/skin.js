@@ -134,17 +134,21 @@
 
     // figure out emitter, path and callback
     // for on(), once() and off() methods
+    // remember, indexFor() will push emitter in indices, if it doesn't exist
     function sanitize(args) {
-      var emitter = this, path, callback = args[args.length - 1];
+      var emitter = this, index = 0, name = null, path, callback = args[args.length - 1];
       // last argument can be the callback
       if (adapter.isFunction(callback)) args = args.slice(0, -1);
       else callback = null;
       // first argument can be the emitter
       if (!adapter.isString(args[0])) { emitter = args[0]; args = args.slice(1); }
-      // the rest is path
-      path = adapter.indexFor(indices, emitter) + (adapter.isString(args[0]) ? '.' + args[0] : '');
+      if (adapter.isString(args[0])) { name = args[0]; }
+      index = adapter.indexFor(indices, emitter) + '';
+      path = index + (name ? '.' + name : '');
       return {
         emitter: emitter,
+        index: index,
+        name: name,
         path: path,
         callback: callback
       };
@@ -152,12 +156,15 @@
 
     function on() {
       var context = this
-        , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0));
-      if (!adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
+        , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
+        , duplicate;
       // make sure the same handler is not added again
       adapter.each(hub[args.path], function(handler) {
-        if (handler.callback === args.callback && handler.context === context) return this;
+        // if duplicate found, return false to break the each iterator
+        if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
       });
+      if (duplicate) return context;
+      if (!adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
       hub[args.path].push({ callback: args.callback, context: context });
       // check if cache should be cleared
       if (args.emitter === cache.emitter) cache = {};
@@ -165,13 +172,20 @@
     }
 
     function once() {
-      var context  = this
-        , args     = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
-        , callback = function() {
-          context.off(args.path, callback);
-          args.callback.apply(context, arguments);
-        };
-      on(args.path, callback);
+      var context = this
+        , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
+        , duplicate;
+      // make sure the same handler is not added again
+      adapter.each(hub[args.path], function(handler) {
+        // if duplicate found, return false to break the each iterator
+        if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
+      });
+      if (duplicate) return context;
+      var callback = function() {
+        context.off(args.emitter, args.name, callback);
+        args.callback.apply(context, arguments);
+      };
+      context.on(args.emitter, args.name, callback);
       return context;
     }
 
@@ -179,15 +193,13 @@
       var context = this
         , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
         , keys    = adapter.keys(hub)
-        , index   = adapter.indexFor(indices, args.emitter);
+        , exist;
       // find all handlers with keys starting with path
-      adapter.filter(keys, function(key) { return key.indexOf(args.path) === 0; });
+      adapter.filter(keys, function(key) { return key === args.path || key.indexOf(args.path + '.') === 0; });
       // find all callbacks to be removed
       adapter.each(keys, function(key) {
         if (args.callback) {
-          adapter.reject(hub[key], function(handler) {
-            return handler.callback === args.callback;
-          });
+          adapter.reject(hub[key], function(handler) { return handler.callback === args.callback; });
           if (!hub[key].length) delete hub[key];
         } else {
           delete hub[key];
@@ -198,34 +210,37 @@
       // check if any other handlers available for the emitter
       // if not, remove the emitter from indices
       keys = adapter.keys(hub);
-      adapter.each(keys, function(key) {
-        if (key.indexOf(index) === 0) return this;
-      });
-      adapter.remove(indices, args.emitter);
-      return this;
+      adapter.each(keys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
+      if (!exist) adapter.remove(indices, args.emitter);
+      return context;
     }
 
-    function trigger(emitter, path, parameters) {
-      var handlers = [], keys;
-      if (adapter.isString(emitter)) { parameters = path; path = emitter; emitter = this; }
+    function trigger(emitter, name, parameters) {
+      var context = this, handlers, path, keys;
+      if (adapter.isString(emitter)) { parameters = name; name = emitter; emitter = context; }
       // if its a cached trigger call, no need to find handlers
-      if (emitter === cache.emitter && path === cache.path) handlers = cache.handlers;
+      if (cache.emitter === emitter && cache.name === name) handlers = cache.handlers;
       else {
-        cache.emitter = emitter;
-        cache.path = path;
-        path = adapter.indexFor(indices, emitter) + (adapter.isString(path) ? '.' + path : '');
+        if (adapter.inArray(indices, emitter) === -1) return context;
+        handlers = [];
+        path = adapter.indexFor(indices, emitter) + (adapter.isString(name) ? '.' + name : '');
+        // add handlers for path
+        if (adapter.objectHas.call(hub, path)) handlers = handlers.concat(hub[path]);
+        // find handlers in namespaced paths
+        path = path + '.';
         keys = adapter.keys(hub);
         adapter.filter(keys, function(key) {
           return key.indexOf(path) === 0;
         });
-        // find all handlers
         adapter.each(keys, function(key) {
           handlers = handlers.concat(hub[key]);
         });
+        cache.emitter = emitter;
+        cache.name = name;
         cache.handlers = handlers;
       }
       adapter.each(handlers, function(handler) { handler.callback.call(handler.context, parameters); });
-      return this;
+      return context;
     }
 
     // to use the module as a behavior
@@ -235,27 +250,27 @@
         var prototype   = this
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
-        if (constructor.check(name)) return this;
+        if (constructor.check(name)) return prototype;
         prototype.on      = on;
         prototype.once    = once;
         prototype.off     = off;
         prototype.trigger = trigger;
-        if (behaviors) behaviors.push(name);
-        return this;
+        behaviors.push(name);
+        return prototype;
       },
 
       remove: function() {
         var prototype   = this
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
-        if (!constructor.check(name)) return this;
+        if (!constructor.check(name)) return prototype;
         off();
         delete prototype.on;
         delete prototype.once;
         delete prototype.off;
         delete prototype.trigger;
         adapter.remove(behaviors, name);
-        return this;
+        return prototype;
       }
 
     };
