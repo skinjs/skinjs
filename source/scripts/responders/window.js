@@ -11,29 +11,47 @@ define('responders/window', ['skin'], function(skin) {
   // provides hooks for window events
 
 
-  var name = 'window', adapter = skin.adapter, handlers = {}, events = ['resize', 'scroll', 'load', 'unload', 'hashchange'];
+  var name = 'window'
+    , adapter = skin.adapter
+    , handlers = {}
+    , events = ['resize', 'scroll', 'load', 'unload', 'hashchange']
+    , w = window, d = document, e = d.documentElement, b = d.body
+    , width, height, top, left;
 
-
-  function add(name) {
+  function add(context, name) {
     if (adapter.inArray(events, name) == -1) return;
-    // existing handler, just increase counter
+    // existing handler,
     if (adapter.objectHas.call(handlers, name)) {
-      handlers[name].counter++;
+      handlers[name].listeners.push(context);
       return;
     }
-    handlers[name] = { counter: 1, old: window['on' + name] };
+    // keep a reference to old handler
+    handlers[name] = { listeners: [context] , handler: window['on' + name] };
     window['on' + name] = function(event) {
       handle(name);
       // calling the old handler
-      if (adapter.isFunction(handlers[name].old)) handlers[name].old();
+      if (adapter.isFunction(handlers[name].handler)) handlers[name].handler();
     };
   }
 
-  function remove(name) {
+  function remove(context, name) {
+    // special case, when there's no name it means
+    // all listeners for the specified context should be removed
+    // this is when something like off(window) is used
+    if (!name.length) {
+      adapter.each(handlers, function(handler, name) {
+        adapter.remove(handler.listeners, context);
+        if (!handler.listeners.length) {
+          window['on' + name] = handler.handler;
+          delete handlers[name];
+        }
+      });
+      return;
+    }
     if (adapter.inArray(events, name) == -1 || !adapter.objectHas.call(handlers, name)) return;
-    handlers[name].counter--;
-    if (handlers[name].counter === 0) {
-      window['on' + name] = handlers[name].old;
+    adapter.remove(handlers[name].listeners, context);
+    if (!handlers[name].listeners.length) {
+      window['on' + name] = handlers[name].handler;
       delete handlers[name];
     }
   }
@@ -42,32 +60,27 @@ define('responders/window', ['skin'], function(skin) {
     switch (name) {
 
       case 'resize':
-        var width = 0, height = 0;
-        if (adapter.isNumber(window.innerWidth)) {
-          width  = window.innerWidth;
-          height = window.innerHeight;
-        } else if (document.documentElement) {
-          width  = document.documentElement.clientWidth;
-          height = document.documentElement.clientHeight;
-        }
+        width  = w.innerWidth  || e.clientWidth  || 0;
+        height = w.innerHeight || e.clientHeight || 0;
         skin.trigger(window, 'resize', { width: width, height: height });
       break;
 
       case 'scroll':
-        var left = 0, top = 0;
-        if (document.body) {
-          top  = document.body.scrollTop;
-          left = document.body.scrollLeft;
-        } else if (document.documentElement) {
-          top  = document.documentElement.scrollTop;
-          left = document.documentElement.scrollLeft;
-        }
+        left = e.scrollLeft || b.scrollLeft || 0;
+        top  = e.scrollTop  || b.scrollTop  || 0;
         skin.trigger(window, 'scroll', { top: top, left: left });
       break;
 
       case 'load':
+        skin.trigger(window, 'load');
+      break;
+
       case 'unload':
+        skin.trigger(window, 'unload');
+      break;
+
       case 'hashchange':
+        skin.trigger(window, 'hashchange', { hash: w.location.hash });
       break;
     }
   }

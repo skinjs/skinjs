@@ -147,7 +147,7 @@
     // for on(), once() and off() methods
     // remember, indexFor() will push emitter in indices, if it doesn't exist
     function sanitize(args) {
-      var emitter = this, index = 0, name = null, path, callback = args[args.length - 1];
+      var emitter = this, index = 0, name = '', path, callback = args[args.length - 1];
       // last argument can be the callback
       if (adapter.isFunction(callback)) args = args.slice(0, -1);
       else callback = null;
@@ -155,7 +155,7 @@
       if (!adapter.isString(args[0])) { emitter = args[0]; args = args.slice(1); }
       if (adapter.isString(args[0])) { name = args[0]; }
       index = adapter.indexFor(indices, emitter) + '';
-      path = index + (name ? '.' + name : '');
+      path = index + (name.length ? '.' + name : '');
       return {
         emitter: emitter,
         index: index,
@@ -181,7 +181,7 @@
       // trim namespace
       name = args.name.split('.')[0];
       if (args.emitter === window) {
-        skin.require(skin.pack, ['responders/window'], function() { responders.window.add(name); });
+        skin.require(skin.pack, ['responders/window'], function() { responders.window.add(context, name); });
       }
 
       if (!adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
@@ -213,19 +213,16 @@
       var context = this
         , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
         , keys    = adapter.keys(hub)
-        , exist;
-      // remember, at this point, an index is created for the emitter
-      // even if it doesn't have any listeners
-      // find all handlers with keys starting with path
+        , exist
+        , name;
+      // remember, at this point an index is created for the emitter
+      // even if it doesn't have any listeners, but at the end we remove empty indices
+      // find all handlers keys starting with path, namespaced keys
       adapter.filter(keys, function(key) { return key === args.path || key.indexOf(args.path + '.') === 0; });
       // find all callbacks to be removed
       adapter.each(keys, function(key) {
-        if (args.callback) {
-          adapter.reject(hub[key], function(handler) { return handler.callback === args.callback; });
-          if (!hub[key].length) delete hub[key];
-        } else {
-          delete hub[key];
-        }
+        adapter.reject(hub[key], function(handler) { return args.callback ? handler.callback === args.callback : handler.context === context; });
+        if (!hub[key].length) delete hub[key];
       });
       // check if cache should be cleared
       if (args.emitter === cache.emitter) cache = {};
@@ -234,6 +231,14 @@
       keys = adapter.keys(hub);
       adapter.each(keys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
       if (!exist) adapter.remove(indices, args.emitter);
+
+      // remove responders for external events
+      // trim namespace
+      name = args.name.split('.')[0];
+      if (args.emitter === window) {
+        skin.require(skin.pack, ['responders/window'], function() { responders.window.remove(context, name); });
+      }
+
       return context;
     }
 
