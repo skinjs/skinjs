@@ -8,16 +8,16 @@
 
 
 
-  // Private Methods and Properties
-  // ==============================
+  // Private Methods & Properties
+  // ============================
   // existing skin is kept as oldSkin, to be assigned back in noConflict()
-  var context = this, oldSkin = context.skin, adapter, events, behaviors, skin;
+  var context = this, oldSkin = context.skin, adapter, events, behaviors, responders, skin;
 
 
 
 
-  // Skin JavaScript Adapter Module
-  // ==============================
+  // JavaScript Adapter Module
+  // =========================
   // provides helpers and shortcuts to be used everywhere
   // basic helpers are added here to be used in this context
   // more helpers can be added to adapter later, via AMD or decorators
@@ -36,6 +36,7 @@
   adapter.isString    = function(symbol) { return typeof(symbol) === 'string'; };
   adapter.isFunction  = function(symbol) { return typeof(symbol) === 'function'; };
   adapter.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; };
+  adapter.isNumber    = function(symbol) { return typeof(symbol) === 'number'; };
   adapter.isUndefined = function(symbol) { return symbol === undefined; };
 
   // iterator, breaks if any iteration returns false
@@ -109,8 +110,8 @@
 
 
 
-  // Skin Behaviors Module
-  // =====================
+  // Behaviors Module
+  // ================
   // empty namespace to hold behavior modules
   // most common behaviors are defined here,
   // others can be loaded and decorate behaviors later
@@ -119,11 +120,21 @@
 
 
 
+  // Responders Module
+  // =================
+  // hooks for adding and removing external event listeners
+  // such as window, mouse, document or keyboard events
+  // or even other libraries, like Backbone
+  responders = {};
+
+
+
+
   // Events Module & Eventable Behavior
   // ==================================
   // provides event management system based on
   // publish, subscribe and unsubscribe model
-  // events are scoped to emitters and paths
+  // events are scoped to emitters and namespaced paths
   // the module servers as a shared event bus
   // also provides hooks to be added to or removed
   // from component prototypes like other behaviors
@@ -157,13 +168,22 @@
     function on() {
       var context = this
         , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
-        , duplicate;
+        , duplicate
+        , name;
       // make sure the same handler is not added again
       adapter.each(hub[args.path], function(handler) {
         // if duplicate found, return false to break the each iterator
         if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
       });
       if (duplicate) return context;
+
+      // create responders for external events
+      // trim namespace
+      name = args.name.split('.')[0];
+      if (args.emitter === window) {
+        skin.require(skin.pack, ['responders/window'], function() { responders.window.add(name); });
+      }
+
       if (!adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
       hub[args.path].push({ callback: args.callback, context: context });
       // check if cache should be cleared
@@ -194,6 +214,8 @@
         , args    = sanitize.call(context, adapter.arraySlice.call(arguments, 0))
         , keys    = adapter.keys(hub)
         , exist;
+      // remember, at this point, an index is created for the emitter
+      // even if it doesn't have any listeners
       // find all handlers with keys starting with path
       adapter.filter(keys, function(key) { return key === args.path || key.indexOf(args.path + '.') === 0; });
       // find all callbacks to be removed
@@ -264,7 +286,7 @@
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
         if (!constructor.check(name)) return prototype;
-        off();
+        prototype.off();
         delete prototype.on;
         delete prototype.once;
         delete prototype.off;
@@ -283,8 +305,8 @@
 
 
 
-  // Skin Factory and Namespace
-  // ==========================
+  // Skin Factory & Namespace
+  // ========================
   // can configure skin's settings
   // or create and return skeleton for skin components
   // which can manage their behaviors, at class level
@@ -316,18 +338,13 @@
         adapter.each(behaviors, function(behavior) {
           if (skin.behaviors[behavior]) {
             skin.behaviors[behavior].add.call(components);
-            //skin.trigger('change');
-            if (component.behaviors.length == behaviors.length) {
-              //skin.trigger('ready');
-            }
+            skin.trigger(component, 'behavior', { type: 'add', name: behavior });
+          } else {
+            skin.require(skin.pack, ['behaviors/' + behavior], function() {
+              skin.behaviors[behavior].add.call(components);
+              skin.trigger(component, 'behavior', { type: 'add', name: behavior });
+            });
           }
-          else skin.require(skin.pack, ['behaviors/' + behavior], function() {
-            skin.behaviors[behavior].add.call(components);
-            //skin.trigger('change');
-            if (component.behaviors.length == behaviors.length) {
-              //skin.trigger('ready');
-            }
-          });
         });
       };
       // method to remove behaviors from the constructor
@@ -342,8 +359,8 @@
 
 
 
-  // Static Methods and Properties
-  // =============================
+  // Static Methods & Properties
+  // ===========================
   // version
   skin.version = '0.1.3';
 
@@ -369,24 +386,21 @@
   // example: var newSkin = skin.noConflict()
   skin.noConflict = function() { context.skin = oldSkin; return this; };
 
-  // make skin eventable
-  skin({ on:      events.on,
-         once:    events.once,
-         off:     events.off,
-         trigger: events.trigger });
-
-
-
-
   // attach modules to skin, make them available everywhere
-  skin.events    = events;
-  skin.adapter   = adapter;
-  skin.behaviors = behaviors;
+  // also make skin eventable
+  skin({ events:     events,
+         adapter:    adapter,
+         behaviors:  behaviors,
+         responders: responders,
+         on:         events.on,
+         once:       events.once,
+         off:        events.off,
+         trigger:    events.trigger });
 
 
 
 
   // export, attach skin to context
   context.skin = skin;
-  if (adapter.isFunction(define) && define.amd) define('skin', skin);
+  if (adapter.isFunction(define) && define.amd) define('skin', function() { return skin; });
 }).call(this);
