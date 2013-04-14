@@ -17,7 +17,6 @@ define('responders/pointer', ['skin'], function(skin) {
   function remove() {}
   function handle() {}
 
-
   skin.responders[name] = { add: add, remove: remove };
 
 

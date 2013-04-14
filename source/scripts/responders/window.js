@@ -26,11 +26,11 @@ define('responders/window', ['skin'], function(skin) {
       return;
     }
     // keep a reference to old handler
-    handlers[name] = { listeners: [context] , handler: window['on' + name] };
+    handlers[name] = { listeners: [context] , oldie: window['on' + name] };
     window['on' + name] = function(event) {
       handle(name);
       // calling the old handler
-      if (adapter.isFunction(handlers[name].handler)) handlers[name].handler();
+      if (adapter.isFunction(handlers[name].oldie)) handlers[name].oldie();
     };
   }
 
@@ -40,18 +40,20 @@ define('responders/window', ['skin'], function(skin) {
     // this is when something like off(window) is used
     if (!name.length) {
       adapter.each(handlers, function(handler, name) {
-        adapter.remove(handler.listeners, context);
+        // remove all context references from all handlers
+        adapter.reject(handler.listeners, function(listener) { return listener === context; });
         if (!handler.listeners.length) {
-          window['on' + name] = handler.handler;
+          window['on' + name] = handler.oldie;
           delete handlers[name];
         }
       });
       return;
     }
     if (adapter.inArray(events, name) == -1 || !adapter.objectHas.call(handlers, name)) return;
+    // remove one of the context references, it may still have namespaced listeners
     adapter.remove(handlers[name].listeners, context);
     if (!handlers[name].listeners.length) {
-      window['on' + name] = handlers[name].handler;
+      window['on' + name] = handlers[name].oldie;
       delete handlers[name];
     }
   }
@@ -82,9 +84,9 @@ define('responders/window', ['skin'], function(skin) {
       case 'hashchange':
         skin.trigger(window, 'hashchange', { hash: w.location.hash });
       break;
+
     }
   }
-
 
   skin.responders[name] = { add: add, remove: remove };
 

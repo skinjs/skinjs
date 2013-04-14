@@ -10,8 +10,8 @@
 
   // Private Methods & Properties
   // ============================
-  // existing skin is kept as oldSkin, to be assigned back in noConflict()
-  var context = this, oldSkin = context.skin, adapter, events, behaviors, responders, skin;
+  // existing skin is kept as oldie, to be assigned back in noConflict()
+  var context = this, oldie = context.skin, adapter, events, behaviors, responders, skin;
 
 
 
@@ -117,6 +117,10 @@
   // others can be loaded and decorate behaviors later
   behaviors = {};
 
+  // API for adding or removing behaviors for components
+  function behave(prototype, name, flag) {
+  }
+
 
 
 
@@ -126,6 +130,16 @@
   // such as window, mouse, document or keyboard events
   // or even other libraries, like Backbone
   responders = {};
+
+  // API for adding or removing responders for external events
+  function respond(emitter, name, context, flag) {
+    // trim namespaced event name
+    name = name.split('.')[0];
+    if (emitter === window) skin.require(skin.pack, ['responders/window'], function() {
+      if (flag) responders.window.add(context, name);
+      else responders.window.remove(context, name);
+    });
+  }
 
 
 
@@ -176,16 +190,10 @@
         if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
       });
       if (duplicate) return context;
-
-      // create responders for external events
-      // trim namespace
-      name = args.name.split('.')[0];
-      if (args.emitter === window) {
-        skin.require(skin.pack, ['responders/window'], function() { responders.window.add(context, name); });
-      }
-
       if (!adapter.objectHas.call(hub, args.path)) hub[args.path] = [];
       hub[args.path].push({ callback: args.callback, context: context });
+      // create responders for external events
+      respond(args.emitter, args.name, context, true);
       // check if cache should be cleared
       if (args.emitter === cache.emitter) cache = {};
       return context;
@@ -231,14 +239,8 @@
       keys = adapter.keys(hub);
       adapter.each(keys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
       if (!exist) adapter.remove(indices, args.emitter);
-
       // remove responders for external events
-      // trim namespace
-      name = args.name.split('.')[0];
-      if (args.emitter === window) {
-        skin.require(skin.pack, ['responders/window'], function() { responders.window.remove(context, name); });
-      }
-
+      respond(args.emitter, args.name, context, false);
       return context;
     }
 
@@ -278,10 +280,7 @@
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
         if (constructor.check(name)) return prototype;
-        prototype.on      = on;
-        prototype.once    = once;
-        prototype.off     = off;
-        prototype.trigger = trigger;
+        adapter.extend(prototype, { on: on, once: once, off: off, trigger: trigger });
         behaviors.push(name);
         return prototype;
       },
@@ -292,10 +291,7 @@
           , behaviors   = constructor.behaviors;
         if (!constructor.check(name)) return prototype;
         prototype.off();
-        delete prototype.on;
-        delete prototype.once;
-        delete prototype.off;
-        delete prototype.trigger;
+        adapter.extend(prototype, { on: undefined, once: undefined, off: undefined, trigger: undefined });
         adapter.remove(behaviors, name);
         return prototype;
       }
@@ -389,7 +385,7 @@
 
   // assign cached skin back and return this object
   // example: var newSkin = skin.noConflict()
-  skin.noConflict = function() { context.skin = oldSkin; return this; };
+  skin.noConflict = function() { context.skin = oldie; return this; };
 
   // attach modules to skin, make them available everywhere
   // also make skin eventable
