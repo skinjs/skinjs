@@ -11,50 +11,50 @@ define('responders/window', ['skin'], function(skin) {
   // provides hooks for window events
 
 
-  var name = 'window'
+  var name    = 'window'
     , adapter = skin.adapter
-    , handlers = {}
-    , events = ['resize', 'scroll', 'load', 'unload', 'hashchange']
+    , hub     = {}
+    , events  = /^(resize|scroll|load|unload|hashchange)$/
     , w = window, d = document, e = d.documentElement, b = d.body
-    , width, height, top, left;
+    , width, height, x, y;
 
-  function add(context, name) {
-    if (adapter.inArray(events, name) == -1) return;
+  function add(name, context) {
+    if (!events.test(name)) return;
     // existing handler,
-    if (adapter.objectHas.call(handlers, name)) {
-      handlers[name].listeners.push(context);
+    if (adapter.objectHas.call(hub, name)) {
+      hub[name].listeners.push(context);
       return;
     }
     // keep a reference to old handler
-    handlers[name] = { listeners: [context] , oldie: window['on' + name] };
+    hub[name] = { listeners: [context] , oldie: window['on' + name] };
     window['on' + name] = function(event) {
       handle(name);
       // calling the old handler
-      if (adapter.isFunction(handlers[name].oldie)) handlers[name].oldie();
+      if (adapter.isFunction(hub[name].oldie)) hub[name].oldie();
     };
   }
 
-  function remove(context, name) {
+  function remove(name, context) {
     // special case, when there's no name it means
     // all listeners for the specified context should be removed
     // this is when something like off(window) is used
     if (!name.length) {
-      adapter.each(handlers, function(handler, name) {
+      adapter.each(hub, function(handler, name) {
         // remove all context references from all handlers
         adapter.reject(handler.listeners, function(listener) { return listener === context; });
         if (!handler.listeners.length) {
           window['on' + name] = handler.oldie;
-          delete handlers[name];
+          delete hub[name];
         }
       });
       return;
     }
-    if (adapter.inArray(events, name) == -1 || !adapter.objectHas.call(handlers, name)) return;
+    if (!events.test(name) || !adapter.objectHas.call(hub, name)) return;
     // remove one of the context references, it may still have namespaced listeners
-    adapter.remove(handlers[name].listeners, context);
-    if (!handlers[name].listeners.length) {
-      window['on' + name] = handlers[name].oldie;
-      delete handlers[name];
+    adapter.remove(hub[name].listeners, context);
+    if (!hub[name].listeners.length) {
+      window['on' + name] = hub[name].oldie;
+      delete hub[name];
     }
   }
 
@@ -68,9 +68,9 @@ define('responders/window', ['skin'], function(skin) {
       break;
 
       case 'scroll':
-        left = e.scrollLeft || b.scrollLeft || 0;
-        top  = e.scrollTop  || b.scrollTop  || 0;
-        skin.trigger(window, 'scroll', { top: top, left: left });
+        x = e.scrollLeft || b.scrollLeft || 0;
+        y = e.scrollTop  || b.scrollTop  || 0;
+        skin.trigger(window, 'scroll', { x: x, y: y });
       break;
 
       case 'load':

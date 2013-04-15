@@ -32,7 +32,7 @@
 
   adapter.isArray     = function(symbol) { return symbol && (symbol.isArray || symbol instanceof Array); };
   adapter.isObject    = function(symbol) { return symbol && typeof(symbol) === 'object' && !adapter.isArray(symbol); };
-  adapter.isElement   = function(symbol) { return symbol && symbol.nodeType == 1; };
+  adapter.isElement   = function(symbol) { return symbol && (symbol.nodeType == 1 || symbol.nodeType == 9); };
   adapter.isString    = function(symbol) { return typeof(symbol) === 'string'; };
   adapter.isFunction  = function(symbol) { return typeof(symbol) === 'function'; };
   adapter.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; };
@@ -128,17 +128,26 @@
   // =================
   // hooks for adding and removing external event listeners
   // such as window, mouse, document or keyboard events
-  // or even other libraries, like Backbone
+  // TODO: other libraries, like Backbone
   responders = {};
 
-  // API for adding or removing responders for external events
+  // API for adding or removing responders for handling external events
   function respond(emitter, name, context, flag) {
     // trim namespaced event name
     name = name.split('.')[0];
-    if (emitter === window) skin.require(skin.pack, ['responders/window'], function() {
-      if (flag) responders.window.add(context, name);
-      else responders.window.remove(context, name);
-    });
+    if (emitter === window) {
+      skin.require(skin.pack, ['responders/window'], function() {
+        if (flag) responders.window.add(name, context);
+        else responders.window.remove(name, context);
+      });
+    } else if (adapter.isElement(emitter) && /key/.test(name)) {
+      // TODO: keyboard responder
+    } else if (adapter.isElement(emitter) && /press|wheel|pointer|drag|drop|pan|swipe|rotate|pinch/.test(name)) {
+      skin.require(skin.pack, ['responders/pointer'], function() {
+        if (flag) responders.pointer.add(emitter, name, context);
+        else responders.pointer.remove(emitter, name, context);
+      });
+    }
   }
 
 
