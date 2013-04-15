@@ -1,28 +1,26 @@
-// skin.js 0.1.3
+// Skin.js 0.1.3
 // © 2013 Soheil Jadidian
-// skin.js may be freely distributed under the MIT license
+// Skin.js may be freely distributed under the MIT license
 // http://skinjs.org
 
-define('behaviors/manageable', ['skin'], function(skin) {
-
+define('behaviors/manageable', ['skin'], function(Skin) {
 
   // Manageable Behavior
   // ===================
   // provides initialize, configure and finalize sequences
   // for component's lifecycle
 
-
-  var name = 'manageable', adapter = skin.adapter;
+  var name = 'Manageable', Tools = Skin.Tools;
 
   function initialize() {
     var prototype   = this
       , constructor = prototype.constructor;
 
     // clone constructor's default settings into prototype's settings
-    adapter.extend(prototype.settings, constructor.defaults);
+    Tools.extend(prototype.settings, constructor.defaults);
 
     if (prototype.trigger) prototype.trigger('initialize');
-    adapter.each(constructor.initializers, function(initializer) {
+    Tools.each(constructor.initializers, function(initializer) {
       initializer.call(prototype);
     });
   }
@@ -32,10 +30,10 @@ define('behaviors/manageable', ['skin'], function(skin) {
       , constructor = prototype.constructor;
 
     // update settings
-    adapter.extend(prototype.settings, settings);
+    Tools.extend(prototype.settings, settings);
 
     if (prototype.trigger) prototype.trigger('configure');
-    adapter.each(constructor.configurers, function(configurer) {
+    Tools.each(constructor.configurers, function(configurer) {
       configurer.call(prototype, settings);
     });
   }
@@ -45,14 +43,12 @@ define('behaviors/manageable', ['skin'], function(skin) {
       , constructor = prototype.constructor;
 
     if (prototype.trigger) prototype.trigger('finalize');
-    adapter.each(constructor.finalizers, function(finalizer) {
+    Tools.each(constructor.finalizers, function(finalizer) {
       finalizer.call(prototype);
     });
   }
 
-
-  skin.behaviors[name] = {
-
+  Skin.Behaviors[name] = {
 
     add: function() {
       var prototype   = this
@@ -80,12 +76,7 @@ define('behaviors/manageable', ['skin'], function(skin) {
         , behaviors   = constructor.behaviors;
       if (!constructor.check(name)) return this;
     }
-
-
   };
 
-
-
-
-  return skin;
+  return Skin;
 });
