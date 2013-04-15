@@ -1,4 +1,4 @@
-// Skin.js 0.1.3
+// Skin.js 0.1.4
 // © 2013 Soheil Jadidian
 // Skin.js may be freely distributed under the MIT license
 // http://skinjs.org
@@ -377,7 +377,7 @@
   // Static Methods & Properties
   // ===========================
   // version
-  Skin.version = '0.1.3';
+  Skin.version = '0.1.4';
 
   // name, used for plugins, unique id prefix etc.
   Skin.alias = 'skin';
