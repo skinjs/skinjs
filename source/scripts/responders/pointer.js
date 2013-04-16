@@ -9,7 +9,13 @@ define('responders/pointer', ['skin'], function(Skin) {
   // ========================
   // hooks for mouse, pen or touch events
 
-  var w = window, d = document, e = d.documentElement, b = d.body, n = w.navigator, name = 'Pointer', Tools = Skin.Tools, hub = {}, indices = [];
+  var w = window, d = document, e = d.documentElement, b = d.body, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = []
+    , down   = /(start|down)$/i
+    , move   = /move$/i
+    , up     = /(up|end)$/i
+    , cancel = /cancel$/i
+    , over   = /(over|enter)$/
+    , out    = /(out|leave)$/;
 
   // supported events
   // ----------------
@@ -79,54 +85,54 @@ define('responders/pointer', ['skin'], function(Skin) {
 
   function add(element, name, context, callback) {
     var index = Tools.indexFor(indices, element) + '.'
-      , event;
+      , type;
 
     switch (name) {
       case 'pointerdown':
-        event = isSupported('pointerdown') ? 'pointerdown'
-              : isSupported('touchstart') ? 'touchstart'
-              : n.msPointerEnabled ? 'MSPointerDown'
-              : 'mousedown';
+        type = isSupported('pointerdown') ? 'pointerdown'
+             : isSupported('touchstart') ? 'touchstart'
+             : n.msPointerEnabled ? 'MSPointerDown'
+             : 'mousedown';
         break;
       case 'pointerup':
-        event = isSupported('pointerup') ? 'pointerup'
-              : isSupported('touchend') ? 'touchend'
-              : n.msPointerEnabled ? 'MSPointerUp'
-              : 'mouseup';
+        type = isSupported('pointerup') ? 'pointerup'
+             : isSupported('touchend') ? 'touchend'
+             : n.msPointerEnabled ? 'MSPointerUp'
+             : 'mouseup';
         break;
       case 'pointermove':
-        event = isSupported('pointermove') ? 'pointermove'
-              : isSupported('touchmove') ? 'touchmove'
-              : n.msPointerEnabled ? 'MSPointerMove'
-              : 'mousemove';
+        type = isSupported('pointermove') ? 'pointermove'
+             : isSupported('touchmove') ? 'touchmove'
+             : n.msPointerEnabled ? 'MSPointerMove'
+             : 'mousemove';
         break;
       case 'pointercancel':
         // touch only
-        event = isSupported('pointercancel') ? 'pointercancel'
-              : isSupported('touchcancel') ? 'touchcancel'
-              : n.msPointerEnabled ? 'MSPointerCancel'
-              : null;
+        type = isSupported('pointercancel') ? 'pointercancel'
+             : isSupported('touchcancel') ? 'touchcancel'
+             : n.msPointerEnabled ? 'MSPointerCancel'
+             : null;
         break;
       case 'pointerover':
         // mouse only
-        event = isSupported('mouseenter') ? 'mouseenter'
-              : 'mouseover';
+        type = isSupported('mouseenter') ? 'mouseenter'
+             : 'mouseover';
         break;
       case 'pointerout':
         // mouse only
-        event = isSupported('mouseleave') ? 'mouseleave'
-              : 'mouseout';
+        type = isSupported('mouseleave') ? 'mouseleave'
+             : 'mouseout';
         break;
     }
 
-    if (name) {
+    if (type) {
       var path = index + name;
-      if (Tools.objectHas.call(hub, path)) {
+      if (hub[path]) {
         hub[path].push(context);
       } else {
         hub[path] = [context];
-        if (callback) element.addEventListener(name, callback, false);
-        else element.addEventListener(name, handle, false);
+        if (callback) element.addEventListener(type, callback, false);
+        else element.addEventListener(type, handle, false);
       }
     }
   }
@@ -137,15 +143,23 @@ define('responders/pointer', ['skin'], function(Skin) {
   function handle(event) {
     var element = event.currentTarget
       , index   = Tools.indexFor(indices, element) + '.'
-      , type    = event.type;
+      , name    = move.test(event.type) ? 'pointermove'
+                : over.test(event.type) ? 'pointerover'
+                : out.test(event.type) ? 'pointerout'
+                : down.test(event.type) ? 'pointerdown'
+                : up.test(event.type) ? 'pointerup'
+                : 'pointercancel'
+      , path    = index + name;
 
-    if (Tools.objectHas.call(hub, index + type)) {
+    if (hub[path]) {
       event.stopPropagation();
+      Tools.each(hub[path], function(context) {
+        context.trigger(element, name, { x: event.clientX, y: event.clientY });
+      });
     }
-
   }
 
 
-  Skin.Responders[name] = { add: add, remove: remove };
+  Skin.Responders.Pointer = { add: add, remove: remove };
   return Skin;
 });

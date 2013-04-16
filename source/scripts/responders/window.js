@@ -10,7 +10,7 @@ define('responders/window', ['skin'], function(Skin) {
   // hooks for window events
   // supports resize, scroll, load, unload, hashchange
 
-  var w = window, d = document, e = d.documentElement, b = d.body, name = 'Window', Tools = Skin.Tools, hub = {}, width, height, x, y;
+  var w = window, d = document, e = d.documentElement, b = d.body, Tools = Skin.Tools, hub = {}, width, height, x, y;
 
   function add(emitter, name, context) {
     // existing handler
@@ -22,11 +22,11 @@ define('responders/window', ['skin'], function(Skin) {
     // also have a count and reference for listeners
     // so we can easily remove all listeners for a context
     // or remove the name from hub when there's no listeners
-    hub[name] = { listeners: [context] , oldie: w['on' + name] };
+    hub[name] = { listeners: [context] , handler: w['on' + name] };
     w['on' + name] = function(event) {
       handle(name);
       // calling the old handler
-      if (Tools.isFunction(hub[name].oldie)) hub[name].oldie();
+      if (Tools.isFunction(hub[name].handler)) hub[name].handler();
     };
   }
 
@@ -39,7 +39,7 @@ define('responders/window', ['skin'], function(Skin) {
         // remove all context references from all handlers
         Tools.reject(handler.listeners, function(listener) { return listener === context; });
         if (!handler.listeners.length) {
-          w['on' + name] = handler.oldie;
+          w['on' + name] = handler.handler;
           delete hub[name];
         }
       });
@@ -49,7 +49,7 @@ define('responders/window', ['skin'], function(Skin) {
     // remove one of the context references, it may still have namespaced listeners
     Tools.remove(hub[name].listeners, context);
     if (!hub[name].listeners.length) {
-      w['on' + name] = hub[name].oldie;
+      w['on' + name] = hub[name].handler;
       delete hub[name];
     }
   }
@@ -85,6 +85,6 @@ define('responders/window', ['skin'], function(Skin) {
   }
 
 
-  Skin.Responders[name] = { add: add, remove: remove };
+  Skin.Responders.Window = { add: add, remove: remove };
   return Skin;
 });

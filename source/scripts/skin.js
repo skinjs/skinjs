@@ -140,7 +140,7 @@
       Skin.require(Skin.pack, ['responders/window'], function() {
         if (flag) Responders.Window.add(emitter, name, context);
         else Responders.Window.remove(emitter, name, context);
-        context.trigger('load.responders.window');
+        context.trigger('respond.window');
       });
     } else if (Tools.isElement(emitter) && /^key(press|up|down)/.test(name)) {
     } else if (Tools.isElement(emitter) && /^(double|long|control){0,1}press$/.test(name)) {
@@ -152,6 +152,7 @@
       Skin.require(Skin.pack, ['responders/pointer'], function() {
         if (flag) Responders.Pointer.add(emitter, name, context);
         else Responders.Pointer.remove(emitter, name, context);
+        context.trigger('respond.pointer');
       });
     }
   }
