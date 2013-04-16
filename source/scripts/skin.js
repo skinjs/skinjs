@@ -138,19 +138,20 @@
     name = name.split('.')[0];
     if (emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name)) {
       Skin.require(Skin.pack, ['responders/window'], function() {
-        if (flag) Responders.window.add(emitter, name, context);
-        else Responders.window.remove(emitter, name, context);
+        if (flag) Responders.Window.add(emitter, name, context);
+        else Responders.Window.remove(emitter, name, context);
+        context.trigger('load.responders.window');
       });
     } else if (Tools.isElement(emitter) && /^key(press|up|down)/.test(name)) {
     } else if (Tools.isElement(emitter) && /^(double|long|control){0,1}press$/.test(name)) {
       Skin.require(Skin.pack, ['responders/press'], function() {
-        if (flag) Responders.press.add(emitter, name, context);
-        else Responders.press.remove(emitter, name, context);
+        if (flag) Responders.Press.add(emitter, name, context);
+        else Responders.Press.remove(emitter, name, context);
       });
     } else if (Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out)$/.test(name)) {
       Skin.require(Skin.pack, ['responders/pointer'], function() {
-        if (flag) Responders.pointer.add(emitter, name, context);
-        else Responders.pointer.remove(emitter, name, context);
+        if (flag) Responders.Pointer.add(emitter, name, context);
+        else Responders.Pointer.remove(emitter, name, context);
       });
     }
   }
