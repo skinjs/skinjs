@@ -5,13 +5,10 @@ describe('Responders Module', function () {
   function simulate(element, eventName) {
     var options = extend(defaultOptions, arguments[2] || {});
     var oEvent, eventType = null;
-
     for (var name in eventMatchers) {
       if (eventMatchers[name].test(eventName)) { eventType = name; break; }
     }
-
-    if (!eventType) throw new SyntaxError('Only HTMLEvents and MouseEvents interfaces are supported');
-
+    if (!eventType) throw new SyntaxError('Only HTML and Mouse Event interfaces are supported for simulation');
     if (document.createEvent) {
       oEvent = document.createEvent(eventType);
       if (eventType == 'HTMLEvents') {
@@ -33,8 +30,7 @@ describe('Responders Module', function () {
   }
 
   function extend(destination, source) {
-    for (var property in source)
-    destination[property] = source[property];
+    for (var property in source) destination[property] = source[property];
     return destination;
   }
 
@@ -56,19 +52,24 @@ describe('Responders Module', function () {
   }
 
 
+
+
   it('is available', function (){
     expect(Responders).to.exist;
   });
 
-  describe('Window Responder', function() {
-    Skin({ pack: { baseUrl: '../destination/scripts/' }});
-    var Foo = Skin('test')
-      , foo = new Foo();
-    Foo.is('Eventable');
 
-    var Bar = Skin('test')
-      , bar = new Bar();
+
+
+  describe('Window Responder', function() {
+
+
+    Skin({ pack: { baseUrl: '../destination/scripts/' }});
+    var Foo = Skin('test'), foo = new Foo();
+    Foo.is('Eventable');
+    var Bar = Skin('test'), bar = new Bar();
     Bar.is('Eventable');
+
 
     it('loads asynchronously', function(done) {
       foo.on(window, 'resize', function(event) {
@@ -77,36 +78,51 @@ describe('Responders Module', function () {
       });
 
       foo.on('respond.window', function() {
-        window.onresize();
+        simulate(window, 'resize');
         foo.off(window);
       });
     });
 
-    it('responds to window resize and returns width and height', function() {
+
+    it('responds to window resize and returns width and height', function(done) {
       foo.on(window, 'resize', function(event) {
         expect(event.width).to.equal(window.innerWidth);
         expect(event.height).to.equal(window.innerHeight);
+        done();
       });
 
-      window.onresize();
-      foo.off(window);
+      var timeout = setTimeout(function() {
+        clearTimeout(timeout);
+        timeout = null;
+        simulate(window, 'resize');
+        foo.off(window);
+      }, 100);
     });
 
-    it('can assign multiple namespaced callbacks to window resize', function() {
+
+    it('assigns multiple namespaced callbacks to window resize', function(done) {
       var count = 0;
       function check() { count++; }
+
       bar.on(window, 'resize.bar', function(event) { check(); });
       foo.on(window, 'resize.foo', function(event) { check(); });
 
-      window.onresize();
-      foo.off(window);
-      bar.off(window);
-      expect(count).to.equal(2);
+      var timeout = setTimeout(function() {
+        clearTimeout(timeout);
+        timeout = null;
+        simulate(window, 'resize');
+        foo.off(window);
+        bar.off(window);
+        expect(count).to.equal(2);
+        done();
+      }, 100);
     });
 
-    it('removes callbacks to window resize', function() {
+
+    it('removes callbacks to window resize', function(done) {
       var count = 0;
       function check() { count++; }
+
       bar.on(window, 'resize.one', function(event) { check(); });
       foo.on(window, 'resize.two', function(event) { check(); });
       bar.on(window, 'resize.three', function(event) { check(); });
@@ -114,11 +130,17 @@ describe('Responders Module', function () {
       foo.off(window, 'resize.two');
       bar.off(window, 'resize.three');
 
-      window.onresize();
-      foo.off(window);
-      bar.off(window);
-      expect(count).to.equal(2);
+      var timeout = setTimeout(function() {
+        clearTimeout(timeout);
+        timeout = null;
+        simulate(window, 'resize');
+        foo.off(window);
+        bar.off(window);
+        expect(count).to.equal(2);
+        done();
+      }, 100);
     });
+
 
     it('responds to window scroll and returns x and y', function(done) {
       foo.on(window, 'scroll.namespaced', function(event) {
@@ -128,39 +150,83 @@ describe('Responders Module', function () {
       });
 
       var timeout = setTimeout(function() {
-        window.onscroll();
         clearTimeout(timeout);
         timeout = null;
+        simulate(window, 'scroll');
       }, 100);
     });
 
+
   });
 
+
   describe('Pointer Responder', function() {
+
+
     Skin({ pack: { baseUrl: '../destination/scripts/' }});
-    var Foo = Skin('test')
-      , foo = new Foo();
-    Foo.is('Eventable');
-
-    var Bar = Skin('test')
-      , bar = new Bar();
-    Bar.is('Eventable');
-
+    var Component = Skin('test'), component = new Component();
+    Component.is('Eventable');
     var element = document.createElement('div');
 
-    var event = new CustomEvent('mousedown', { detail: { time: new Date() }, bubbles: true, cancelable: true });
 
     it('loads asynchronously', function(done) {
-      foo.on(element, 'pointerdown', function(event) {
+      check = false;
+      component.on(element, 'pointerdown', function(event) { check = true; });
+
+      component.once('respond.pointer', function() {
+        simulate(element, 'mousedown');
+        simulate(element, 'touchstart');
+        simulate(element, 'pointerdown');
+        component.off(element);
+        expect(check).to.be.true;
+        done();
+      });
+    });
+
+
+    it('responds to pointerdown and returns pointer parameters', function(done) {
+      component.once(element, 'pointerdown.namespaced', function(event) {
         expect(event).to.exist;
         done();
       });
 
-      foo.on('respond.pointer', function() {
+      component.once('respond.pointer', function() {
         simulate(element, 'mousedown');
+        simulate(element, 'touchstart');
+        simulate(element, 'pointerdown');
       });
     });
 
+
+    it('responds to pointerup and returns pointer parameters', function(done) {
+      component.once(document.body, 'pointerup', function(event) {
+        expect(event).to.exist;
+        done();
+      });
+
+      component.once('respond.pointer', function() {
+        simulate(document.body, 'mouseup');
+        simulate(document.body, 'touchend');
+        simulate(document.body, 'pointerup');
+      });
+    });
+
+
+    it('responds to pointermove and returns pointer parameters', function(done) {
+      component.once(element, 'pointermove', function(event) {
+        expect(event).to.exist;
+        done();
+      });
+
+      component.once('respond.pointer', function() {
+        simulate(element, 'mousemove');
+        simulate(element, 'touchmove');
+        simulate(element, 'pointermove');
+      });
+    });
+
+
   });
+
 
 });

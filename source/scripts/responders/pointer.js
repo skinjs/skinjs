@@ -8,6 +8,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   // Pointer Responder Module
   // ========================
   // hooks for mouse, pen or touch events
+  // supports pointerdown, pointerup, pointermove, pointercancel, pointerover, pointerout
 
   var w = window, d = document, e = d.documentElement, b = d.body, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = []
     , down   = /(start|down)$/i
@@ -83,78 +84,122 @@ define('responders/pointer', ['skin'], function(Skin) {
     };
   }
 
-  function add(element, name, context, callback) {
-    var index = Tools.indexFor(indices, element) + '.'
-      , type;
-
+  // find supported event type based on name
+  function typeOfName(name) {
     switch (name) {
       case 'pointerdown':
-        type = isSupported('pointerdown') ? 'pointerdown'
+        return isSupported('pointerdown') ? 'pointerdown'
              : isSupported('touchstart') ? 'touchstart'
              : n.msPointerEnabled ? 'MSPointerDown'
              : 'mousedown';
-        break;
+
       case 'pointerup':
-        type = isSupported('pointerup') ? 'pointerup'
+        return isSupported('pointerup') ? 'pointerup'
              : isSupported('touchend') ? 'touchend'
              : n.msPointerEnabled ? 'MSPointerUp'
              : 'mouseup';
-        break;
+
       case 'pointermove':
-        type = isSupported('pointermove') ? 'pointermove'
+        return isSupported('pointermove') ? 'pointermove'
              : isSupported('touchmove') ? 'touchmove'
              : n.msPointerEnabled ? 'MSPointerMove'
              : 'mousemove';
-        break;
+
       case 'pointercancel':
-        // touch only
-        type = isSupported('pointercancel') ? 'pointercancel'
+        return isSupported('pointercancel') ? 'pointercancel'
              : isSupported('touchcancel') ? 'touchcancel'
              : n.msPointerEnabled ? 'MSPointerCancel'
              : null;
-        break;
-      case 'pointerover':
-        // mouse only
-        type = isSupported('mouseenter') ? 'mouseenter'
-             : 'mouseover';
-        break;
-      case 'pointerout':
-        // mouse only
-        type = isSupported('mouseleave') ? 'mouseleave'
-             : 'mouseout';
-        break;
-    }
 
+      case 'pointerover':
+        return isSupported('mouseenter') ? 'mouseenter'
+             : 'mouseover';
+
+      case 'pointerout':
+        return isSupported('mouseleave') ? 'mouseleave'
+             : 'mouseout';
+
+      default:
+        return null;
+    }
+  }
+
+  // find standard event name based on type
+  function nameOfType(type) {
+    return move.test(type) ? 'pointermove'
+         : over.test(type) ? 'pointerover'
+         : out.test(type) ? 'pointerout'
+         : down.test(type) ? 'pointerdown'
+         : up.test(type) ? 'pointerup'
+         : 'pointercancel';
+  }
+
+  // element or emitter, event's name, context or callback
+  // callback is intended to be used by more complex responders
+  // if callback is specified, it means other responders will
+  // handle the event, so it won't be registered in hub and handled here
+  function add(element, name, context, callback) {
+    var type = typeOfName(name);
     if (type) {
-      var path = index + name;
-      if (hub[path]) {
-        hub[path].push(context);
+      if (callback) {
+        // handled by other responders
+        element.addEventListener(type, callback, false);
       } else {
-        hub[path] = [context];
-        if (callback) element.addEventListener(type, callback, false);
-        else element.addEventListener(type, handle, false);
+        var path = Tools.indexFor(indices, element) + '.' + name;
+        if (hub[path]) {
+          hub[path].push(context);
+        } else {
+          hub[path] = [context];
+          element.addEventListener(type, handle, false);
+        }
       }
     }
   }
 
   function remove(element, name, context, callback) {
-  } 
+    // special case, when there's no name it means
+    // all handlers for the specified context should be removed
+    // this is when something like context.off(element) was used
+    if (!name.length) {
+      Tools.each(hub, function(contexts, path) {
+        Tools.reject(contexts, function(which) { return which === context; });
+        if (!contexts.length) {
+          var type = typeOfName(path.split('.')[1]);
+          element.removeEventListener(type, handle);
+          delete hub[path];
+        }
+      });
+      return;
+    }
+
+    // normal case, name is specified
+    var type = typeOfName(name);
+    if (type) {
+      if (callback) {
+        // handled by other responders
+        element.removeEventListener(type, callback);
+      } else {
+        var path = Tools.indexFor(indices, element) + '.' + name;
+        if (hub[path]) {
+          Tools.remove(hub[path], context);
+          if (!hub[path].length) {
+            element.removeEventListener(type, handle);
+            delete hub[path];
+          }
+        }
+      }
+    }
+  }
 
   function handle(event) {
     var element = event.currentTarget
-      , index   = Tools.indexFor(indices, element) + '.'
-      , name    = move.test(event.type) ? 'pointermove'
-                : over.test(event.type) ? 'pointerover'
-                : out.test(event.type) ? 'pointerout'
-                : down.test(event.type) ? 'pointerdown'
-                : up.test(event.type) ? 'pointerup'
-                : 'pointercancel'
-      , path    = index + name;
+      , name    = nameOfType(event.type)
+      , path    = Tools.indexFor(indices, element) + '.' + name;
 
     if (hub[path]) {
       event.stopPropagation();
       Tools.each(hub[path], function(context) {
-        context.trigger(element, name, { x: event.clientX, y: event.clientY });
+        context.trigger(element, name, { x: event.clientX, y: event.clientY, event: event });
       });
     }
   }

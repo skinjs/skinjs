@@ -134,6 +134,11 @@
   // TODO: mechanism for registering responders, refactoring
   // API for adding or removing responders for handling external events
   function respond(emitter, name, context, flag) {
+    if (!name.length && !flag) {
+      // special case, remove form all available responders
+      Tools.each(Responders, function(responder) { responder.remove(emitter, name, context); });
+      return;
+    }
     // trim namespaced event name
     name = name.split('.')[0];
     if (emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name)) {
@@ -150,9 +155,12 @@
       });
     } else if (Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out)$/.test(name)) {
       Skin.require(Skin.pack, ['responders/pointer'], function() {
-        if (flag) Responders.Pointer.add(emitter, name, context);
-        else Responders.Pointer.remove(emitter, name, context);
-        context.trigger('respond.pointer');
+        if (flag) {
+          Responders.Pointer.add(emitter, name, context);
+          context.trigger('respond.pointer');
+        } else {
+          Responders.Pointer.remove(emitter, name, context);
+        }
       });
     }
   }

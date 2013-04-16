@@ -15,18 +15,18 @@ define('responders/window', ['skin'], function(Skin) {
   function add(emitter, name, context) {
     // existing handler
     if (hub[name]) {
-      hub[name].listeners.push(context);
+      hub[name].contexts.push(context);
       return;
     }
-    // new handler, keep a reference to old handler
-    // also have a count and reference for listeners
-    // so we can easily remove all listeners for a context
-    // or remove the name from hub when there's no listeners
-    hub[name] = { listeners: [context] , handler: w['on' + name] };
+    // new handler, we keep a reference to old handler
+    // also keep a count and reference for contexts listening,
+    // so we can easily remove all bindings for a context
+    // or remove the name from hub when there's no context listening
+    hub[name] = { contexts: [context] , old: w['on' + name] };
     w['on' + name] = function(event) {
       handle(name);
       // calling the old handler
-      if (Tools.isFunction(hub[name].handler)) hub[name].handler();
+      if (Tools.isFunction(hub[name].handler)) hub[name].old();
     };
   }
 
@@ -37,19 +37,19 @@ define('responders/window', ['skin'], function(Skin) {
     if (!name.length) {
       Tools.each(hub, function(handler, name) {
         // remove all context references from all handlers
-        Tools.reject(handler.listeners, function(listener) { return listener === context; });
-        if (!handler.listeners.length) {
-          w['on' + name] = handler.handler;
+        Tools.reject(handler.contexts, function(which) { return which === context; });
+        if (!handler.contexts.length) {
+          w['on' + name] = handler.old;
           delete hub[name];
         }
       });
       return;
     }
-    if (!Tools.objectHas.call(hub, name)) return;
-    // remove one of the context references, it may still have namespaced listeners
-    Tools.remove(hub[name].listeners, context);
-    if (!hub[name].listeners.length) {
-      w['on' + name] = hub[name].handler;
+    if (!hub[name]) return;
+    // remove one of the context references, it may have other namespaced listeners
+    Tools.remove(hub[name].contexts, context);
+    if (!hub[name].contexts.length) {
+      w['on' + name] = hub[name].old;
       delete hub[name];
     }
   }
