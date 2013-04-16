@@ -1,15 +1,20 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-  <title>Skin Unit Tests</title>
-
-  <!-- vendor -->
-  <link rel="stylesheet" href="vendor/qunit.css" type="text/css" media="screen" />
+  <title>Skin Tests</title>
+  <link rel="stylesheet" href="../node_modules/mocha/mocha.css" />
+</head>
+<body>
+  <div id="mocha"></div>
+  <script src="../node_modules/mocha/mocha.js"></script>
+  <script src="../node_modules/chai/chai.js"></script>
+  <script>
+    mocha.ui('bdd');
+    mocha.reporter('html');
+    var expect = chai.expect;
+  </script>
 
   <script src="vendor/require.js"></script>
-  <script src="vendor/jquery.js"></script>
-  <script src="vendor/qunit.js"></script>
-  <script src="vendor/logger.js"></script>
 
   <!-- skin -->
   <script src="../destination/scripts/skin.js"></script>
@@ -19,14 +24,11 @@
   <script src="tools.js"></script>
   <script src="events.js"></script>
 
-</head>
-<body>
-  <div>
-    <h1 id="qunit-header">Skin Unit Tests</h1>
-    <h2 id="qunit-banner"></h2>
-    <h2 id="qunit-userAgent"></h2>
-    <ol id="qunit-tests"></ol>
-    <div id="qunit-fixture"></div>
-  </div>
+  <script>
+    // phantom
+    if (window.mochaPhantomJS) { mochaPhantomJS.run(); }
+    // browser
+    else { mocha.run(); }
+  </script>
 </body>
 </html>

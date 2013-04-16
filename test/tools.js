@@ -1,93 +1,118 @@
-$(document).ready(function() {
+describe('Tools Module', function () {
 
-  module('Tools')
+  var Tools = Skin.Tools;
 
-  var Tools
+  it('is available', function (){
+    expect(Tools).to.exist;
+  });
 
-  test('availability', 1, function() {
-    Tools = Skin.Tools
-    ok(Tools != undefined, 'Tools module is available')
-  })
+  describe('Shortcuts', function() {
+    it('has basic types', function() {
+      expect(Tools.objects).to.equal(Object.prototype);
+      expect(Tools.arrays).to.equal(Array.prototype);
+      expect(Tools.arraySlice).to.equal(Array.prototype.slice);
+      expect(Tools.objectHas).to.equal(Object.prototype.hasOwnProperty);
+    })
+  });
 
-  test('shortcuts', 4, function() {
-    Tools = Skin.Tools
-    ok(Tools.objects === Object.prototype, 'object prototype')
-    ok(Tools.arrays === Array.prototype, 'array prototype')
-    ok(Tools.arraySlice === Array.prototype.slice, 'array slice')
-    ok(Tools.objectHas === Object.prototype.hasOwnProperty, 'object has own property')
-  })
+  describe('Type Checks', function() {
+    var array = [1, 2, 3], object = { key: 'value' }, string = 'string';
 
-  test('basic helper methods', 33, function() {
-    Tools = Skin.Tools
-    var array = [1, 2, 3], object = { key: 'value' }, string = "string"
-    ok(Tools.isArray(array), 'detect array by reference')
-    ok(Tools.isArray([]), 'detect empty array on the fly')
-    ok(!Tools.isArray(object), 'object is not array')
-    ok(!Tools.isArray(string), 'string is not array')
-    ok(!Tools.isArray(null), 'null is not array')
-    ok(!Tools.isArray(), 'undefined is not array')
+    it('detects plain objects', function() {
+      expect(Tools.isObject(object)).to.be.true;
+      expect(Tools.isObject({})).to.be.true;
+      expect(Tools.isObject(array)).to.be.false;
+      expect(Tools.isObject(string)).to.be.false;
+      expect(Tools.isObject(null)).to.be.false;
+      expect(Tools.isObject()).to.be.false;
+    });
 
-    ok(Tools.isString(string), 'detect string by reference')
-    ok(Tools.isString(''), 'detect empty string')
-    ok(!Tools.isString(array), 'array is not string')
-    ok(!Tools.isString(object), 'object is not string')
-    ok(!Tools.isString(null), 'null is not string')
-    ok(!Tools.isString(), 'undefined is not string')
+    it('detects functions', function() {
+      expect(Tools.isFunction(function() {})).to.be.true;
+      expect(Tools.isFunction(object)).to.be.false;
+      expect(Tools.isFunction(null)).to.be.false;
+      expect(Tools.isFunction()).to.be.false;
+    });
 
-    ok(Tools.isFunction(function() {}), 'detect function')
-    ok(!Tools.isFunction(object), 'object is not function')
-    ok(!Tools.isFunction(null), 'null is not function')
-    ok(!Tools.isFunction(), 'undefined is not function')
+    it('detects arrays', function() {
+      expect(Tools.isArray(array)).to.be.true;
+      expect(Tools.isArray([])).to.be.true;
+      expect(Tools.isArray(object)).to.be.false;
+      expect(Tools.isArray(string)).to.be.false;
+      expect(Tools.isArray(null)).to.be.false;
+      expect(Tools.isArray()).to.be.false;
+    });
 
-    ok(Tools.isBoolean(true), 'detect boolean')
-    ok(!Tools.isBoolean(object), 'object is not boolean')
-    ok(!Tools.isBoolean(null), 'null is not boolean')
-    ok(!Tools.isBoolean(), 'undefined is not boolean')
+    it('detects strings', function() {
+      expect(Tools.isString(string)).to.be.true;
+      expect(Tools.isString('')).to.be.true;
+      expect(Tools.isString(array)).to.be.false;
+      expect(Tools.isString(object)).to.be.false;
+      expect(Tools.isString(null)).to.be.false;
+      expect(Tools.isString()).to.be.false;
+    });
 
-    ok(Tools.isUndefined(), 'detect undefined')
-    ok(!Tools.isUndefined(null), 'null is not undefined')
-    ok(!Tools.isUndefined(object), 'object is not undefined')
+    it('detects boolean', function() {
+      expect(Tools.isBoolean(true)).to.be.true;
+      expect(Tools.isBoolean(object)).to.be.false;
+      expect(Tools.isBoolean(null)).to.be.false;
+      expect(Tools.isBoolean()).to.be.false;
+    });
 
-    ok(Tools.isObject(object), 'detect object by reference')
-    ok(Tools.isObject({}), 'detect empty object on the fly')
-    ok(!Tools.isObject(array), 'array is not object')
-    ok(!Tools.isObject(string), 'string is not object')
-    ok(!Tools.isObject(null), 'null is not object')
-    ok(!Tools.isObject(), 'undefined is not object')
+    it('detects undefined', function() {
+      expect(Tools.isUndefined()).to.be.true;
+      expect(Tools.isUndefined(null)).to.be.false;
+      expect(Tools.isUndefined(object)).to.be.false;
+    });
 
-    ok(Tools.isElement(document.body), 'detect element')
-    ok(!Tools.isElement(object), 'object is not element')
-    ok(!Tools.isElement(null), 'null is not element')
-    ok(!Tools.isElement(), 'undefined is not element')
-  })
+    it('detects DOM elements', function() {
+      expect(Tools.isElement(document.body)).to.be.true;
+      expect(Tools.isElement(object)).to.be.false;
+      expect(Tools.isElement(null)).to.be.false;
+      expect(Tools.isElement()).to.be.false;
+    });
+  });
 
-  test('each', 2, function() {
-    Tools = Skin.Tools
-    var array  = [1, 2, 3, null, 4]
-      , object = { a: 1, b: { c: true }, d: undefined, e: null, f: 'foo', g: [1, 2, 3] }
-      , count  = 0
-    Tools.each(array, function(item) { if (item) count += item })
-    equal(count, 10, 'iterated through array')
-    count = 0
-    Tools.each(object, function(item) { count++ })
-    equal(count, 6, 'iterated through object')
-  })
+  describe('Utilities & Helpers', function() {
+    describe('Each Iterator', function() {
+      var array  = [1, 2, 3, null, 4]
+        , object = { a: 1, b: { c: true }, d: undefined, e: null, f: 'foo', g: [1, 2, 3] }
+        , count  = 0;
+      it('iterates through arrays', function() {
+        Tools.each(array, function(item) { if (item) count += item });
+        expect(count).to.equal(10);
+      });
+      it('iterates through objects', function() {
+        Tools.each(object, function(item) { count++ });
+        expect(count).to.equal(16);
+      });
+    });
 
-  test('basic filter and reject', 2, function() {
-    Tools = Skin.Tools
-    var array  = [1, 2, 3, 4, 5, 'a', 'b', 'c', 'foo', 'bar', 'z'];
-    Tools.filter(array, function(item) { return typeof item === 'string' });
-    equal(array.length, 6, 'basic filter function applied to array')
-    Tools.reject(array, function(item) { return item.length > 1 });
-    equal(array.length, 4, 'basic reject function applied to array')
-  })
+    describe('Basic Filter & Reject', function() {
+      var array  = [1, 2, 3, 4, 5, 'a', 'b', 'c', 'foo', 'bar', 'z'];
+      it('filters array items', function() {
+        Tools.filter(array, function(item) { return typeof item === 'string' });
+        expect(array).to.have.length(6);
+        expect(array).to.include('a');
+        expect(array).to.not.include(1);
+      });
+      it('rejects array items', function() {
+        Tools.reject(array, function(item) { return item.length > 1 });
+        expect(array).to.have.length(4);
+        expect(array).to.include('a');
+        expect(array).to.not.include('foo');
+      });
+    });
 
-  test('object keys', 2, function() {
-    Tools = Skin.Tools
-    var full  = { a: 1, b: { c: true }, d: undefined, e: null, f: 'foo', g: [1, 2, 3] }
-      , empty = {}
-    equal(Tools.keys(full).length, 6, 'got object keys for full object')
-    equal(Tools.keys(empty).length, 0, 'did not get object keys for empty object')
-  })
+    describe('Object Keys', function() {
+      var full  = { a: 1, b: { c: true }, d: undefined, e: null, f: 'foo', g: [1, 2, 3] }
+        , empty = {};
+      it('returns array of object keys', function() {
+        expect(Tools.keys(full)).to.have.length(6);
+        expect(Tools.keys(empty)).to.be.empty;
+      });
+    });
+
+  });
 
 });

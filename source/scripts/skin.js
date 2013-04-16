@@ -30,9 +30,9 @@
   Tools.arraySlice  = Tools.arrays.slice;
   Tools.objectHas   = Tools.objects.hasOwnProperty;
 
-  Tools.isArray     = function(symbol) { return symbol && (symbol.isArray || symbol instanceof Array); };
-  Tools.isObject    = function(symbol) { return symbol && typeof(symbol) === 'object' && !Tools.isArray(symbol); };
-  Tools.isElement   = function(symbol) { return symbol && (symbol.nodeType == 1 || symbol.nodeType == 9); };
+  Tools.isArray     = function(symbol) { return !!symbol && (symbol.isArray || symbol instanceof Array); };
+  Tools.isObject    = function(symbol) { return !!symbol && typeof(symbol) === 'object' && !Tools.isArray(symbol); };
+  Tools.isElement   = function(symbol) { return !!symbol && (symbol.nodeType == 1 || symbol.nodeType == 9); };
   Tools.isString    = function(symbol) { return typeof(symbol) === 'string'; };
   Tools.isFunction  = function(symbol) { return typeof(symbol) === 'function'; };
   Tools.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; };

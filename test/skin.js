@@ -1,22 +1,20 @@
-$(document).ready(function() {
+describe('Skin Module', function () {
 
-  module('Skin')
+  it('is available', function (){
+    expect(window.Skin).to.be.a('function');
+  });
 
-  test('availability', 1, function() {
-    ok(window.Skin === Skin && typeof Skin === 'function', 'Skin is available');
-  })
+  it('can avoid conflicts', function (){
+    var NewSkin = Skin.noConflict();
+    expect(window.Skin).to.be.undefined;
+    expect(NewSkin).to.be.a('function');
+    window.Skin = NewSkin;
+    expect(window.Skin === NewSkin).to.be.true;
+  });
 
-  test('avoiding conflicts', 3, function() {
-    var NewSkin = Skin.noConflict()
-    equal(window.Skin, undefined, 'old Skin was assigned back to global')
-    ok(typeof NewSkin === 'function', 'Skin is available by a different name')
-    window.Skin = NewSkin
-    equal(window.Skin, NewSkin, 'Skin assigned back to global')
-  })
-
-  test('configuration', 1, function() {
-    Skin({ pack: { baseUrl: '../destination/scripts/' }})
-    equal(Skin.pack.baseUrl, '../destination/scripts/', 'configured settings through Skin call')
-  })
+  it('is configurable', function() {
+    Skin({ pack: { baseUrl: '../destination/scripts/' }});
+    expect(Skin.pack.baseUrl).to.equal('../destination/scripts/');
+  });
 
 });

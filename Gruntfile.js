@@ -24,19 +24,6 @@ module.exports = function(grunt) {
       }
     },
 
-    coffee: {
-      options: {
-        bare: true
-      },
-      files: {
-        expand: true,
-        cwd: 'source/scripts',
-        src: ['**/*.coffee'],
-        dest: 'destination/scripts/',
-        ext: '.js'
-      }
-    },
-
     uglify: {
       options: {
         beautify: true,
@@ -85,10 +72,6 @@ module.exports = function(grunt) {
       }
     },
 
-    qunit: {
-      all: ['test/**/*.html']
-    },
-
     watch: {
       files: ['Gruntfile.js', 'source/**/*'],
       tasks: ['less', 'jshint', 'uglify', 'rsync:styles', 'rsync:scripts']
@@ -96,11 +79,8 @@ module.exports = function(grunt) {
 
   });
 
-  grunt.loadNpmTasks('grunt-contrib-coffee');
   grunt.loadNpmTasks('grunt-contrib-jshint');
   grunt.loadNpmTasks('grunt-contrib-less');
-  grunt.loadNpmTasks('grunt-contrib-qunit');
-  grunt.loadNpmTasks('grunt-contrib-requirejs');
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-contrib-watch');
   grunt.loadNpmTasks('grunt-rsync');
