@@ -10,7 +10,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   // hooks for mouse, pen or touch events
   // supports pointerdown, pointerup, pointermove, pointercancel, pointerover, pointerout
 
-  var w = window, d = document, e = d.documentElement, b = d.body, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = []
+  var w = window, d = document, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = []
     , down   = /(start|down)$/i
     , move   = /move$/i
     , up     = /(up|end)$/i
@@ -44,7 +44,7 @@ define('responders/pointer', ['skin'], function(Skin) {
 
   // check if browser supports an event
   function isSupported(name) {
-    var element = document.createElement('div'), cache = {}, flag;
+    var element = d.createElement('div'), cache = {}, flag;
     name = 'on' + name;
     if (cache[name]) return cache[name];
     flag = (name in element);
@@ -205,6 +205,6 @@ define('responders/pointer', ['skin'], function(Skin) {
   }
 
 
-  Skin.Responders.Pointer = { add: add, remove: remove };
-  return Skin;
+  var Pointer = Skin.Responders.Pointer = { add: add, remove: remove };
+  return Pointer;
 });

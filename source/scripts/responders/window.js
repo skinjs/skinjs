@@ -85,6 +85,6 @@ define('responders/window', ['skin'], function(Skin) {
   }
 
 
-  Skin.Responders.Window = { add: add, remove: remove };
-  return Skin;
+  var Window = Skin.Responders.Window = { add: add, remove: remove };
+  return Window;
 });
