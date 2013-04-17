@@ -156,7 +156,7 @@
           context.trigger('respond.gesture');
         } else Responders.Gesture.remove(emitter, name, context);
       });
-    } else if (Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out)$/.test(name)) {
+    } else if (Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name)) {
       Skin.require(Skin.pack, ['responders/pointer'], function() {
         if (flag) {
           Responders.Pointer.add(emitter, name, context);
