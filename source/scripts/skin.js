@@ -118,8 +118,8 @@
   Behaviors = {};
 
   // API for adding or removing behaviors for components
-  function behave(prototype, name, flag) {
-  }
+  //function behave(prototype, name, flag) {
+  //}
 
 
 
@@ -131,39 +131,36 @@
   // TODO: other libraries, like Backbone
   Responders = {};
 
-  // TODO: mechanism for registering responders, refactoring
+  // register default responders
+  Tools.each({
+    Window:   function(emitter, name, context) { return emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name); },
+    Keyboard: function(emitter, name, context) { return Tools.isElement(emitter) && /^key(press|up|down)/.test(name); },
+    Pointer:  function(emitter, name, context) { return Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name); },
+    Gesture:  function(emitter, name, context) { return Tools.isElement(emitter) && /^((double|long|control){0,1}press|drop|drag(start|end|enter|leave|over|out){0,1}|(swipe|rotate|pinch)(start|end){0,1})$/.test(name); }
+  }, function(check, name) {
+    Responders[name] = { path: 'responders/' + name.toLowerCase(), check: check };
+  });
+
   // API for adding or removing responders for handling external events
   function respond(emitter, name, context, flag) {
     if (!name.length && !flag) {
       // special case, remove form all available responders
-      Tools.each(Responders, function(responder) { responder.remove(emitter, name, context); });
+      Tools.each(Responders, function(Responder) { if (Responder.remove) Responder.remove(emitter, name, context); });
       return;
     }
     // trim namespaced event name
     name = name.split('.')[0];
-    if (emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name)) {
-      Skin.require(Skin.pack, ['responders/window'], function() {
-        if (flag) {
-          Responders.Window.add(emitter, name, context);
-          context.trigger('respond.window');
-        } else Responders.Window.remove(emitter, name, context);
-      });
-    } else if (Tools.isElement(emitter) && /^key(press|up|down)/.test(name)) {
-    } else if (Tools.isElement(emitter) && /^(double|long|control){0,1}press$/.test(name)) {
-      Skin.require(Skin.pack, ['responders/gesture'], function() {
-        if (flag) {
-          Responders.Gesture.add(emitter, name, context);
-          context.trigger('respond.gesture');
-        } else Responders.Gesture.remove(emitter, name, context);
-      });
-    } else if (Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name)) {
-      Skin.require(Skin.pack, ['responders/pointer'], function() {
-        if (flag) {
-          Responders.Pointer.add(emitter, name, context);
-          context.trigger('respond.pointer');
-        } else Responders.Pointer.remove(emitter, name, context);
-      });
-    }
+    Tools.each(Responders, function(Responder, responderName) {
+      if (Responder.check(emitter, name, context)) {
+        // matching responder
+        Skin.require(Skin.pack, [Responder.path], function() {
+          if (flag) {
+            Responder.add(emitter, name, context);
+            context.trigger('respond.' + responderName.toLowerCase());
+          } else Responder.remove(emitter, name, context);
+        });
+      }
+    });
   }
 
 
@@ -411,6 +408,9 @@
   // assign cached Skin back and return this object
   // example: var NewSkin = Skin.noConflict()
   Skin.noConflict = function() { context.Skin = oldSkin; return this; };
+
+
+
 
   // attach modules to Skin, make them available everywhere
   // also make Skin eventable

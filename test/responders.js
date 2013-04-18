@@ -65,38 +65,32 @@ describe('Responders Module', function () {
 
 
     Skin({ pack: { baseUrl: '../destination/scripts/' }});
-    var Foo = Skin('test'), foo = new Foo();
-    Foo.is('Eventable');
-    var Bar = Skin('test'), bar = new Bar();
-    Bar.is('Eventable');
 
 
     it('loads asynchronously', function(done) {
-      foo.on(window, 'resize', function(event) {
+      Skin.on(window, 'resize', function(event) {
         expect(event).to.exist;
         done();
       });
 
-      foo.on('respond.window', function() {
+      Skin.once('respond.window', function() {
         simulate(window, 'resize');
-        foo.off(window);
+        Skin.off(window);
       });
     });
 
 
     it('responds to window resize and returns width and height', function(done) {
-      foo.on(window, 'resize', function(event) {
+      Skin.on(window, 'resize', function(event) {
         expect(event.width).to.equal(window.innerWidth);
         expect(event.height).to.equal(window.innerHeight);
         done();
       });
 
-      var timeout = setTimeout(function() {
-        clearTimeout(timeout);
-        timeout = null;
+      Skin.once('respond.window', function() {
         simulate(window, 'resize');
-        foo.off(window);
-      }, 100);
+        Skin.off(window);
+      });
     });
 
 
@@ -104,18 +98,14 @@ describe('Responders Module', function () {
       var count = 0;
       function check() { count++; }
 
-      bar.on(window, 'resize.bar', function(event) { check(); });
-      foo.on(window, 'resize.foo', function(event) { check(); });
+      Skin.once(window, 'resize.bar', function(event) { check(); });
+      Skin.once(window, 'resize.foo', function(event) { check(); });
 
-      var timeout = setTimeout(function() {
-        clearTimeout(timeout);
-        timeout = null;
+      Skin.once('respond.window', function() {
         simulate(window, 'resize');
-        foo.off(window);
-        bar.off(window);
         expect(count).to.equal(2);
         done();
-      }, 100);
+      });
     });
 
 
@@ -123,37 +113,31 @@ describe('Responders Module', function () {
       var count = 0;
       function check() { count++; }
 
-      bar.on(window, 'resize.one', function(event) { check(); });
-      foo.on(window, 'resize.two', function(event) { check(); });
-      bar.on(window, 'resize.three', function(event) { check(); });
-      foo.on(window, 'resize.four', function(event) { check(); });
-      foo.off(window, 'resize.two');
-      bar.off(window, 'resize.three');
+      Skin.once(window, 'resize.one', function(event) { check(); });
+      Skin.once(window, 'resize.two', function(event) { check(); });
+      Skin.once(window, 'resize.three', function(event) { check(); });
+      Skin.once(window, 'resize.four', function(event) { check(); });
+      Skin.off(window, 'resize.two');
+      Skin.off(window, 'resize.three');
 
-      var timeout = setTimeout(function() {
-        clearTimeout(timeout);
-        timeout = null;
+      Skin.once('respond.window', function() {
         simulate(window, 'resize');
-        foo.off(window);
-        bar.off(window);
         expect(count).to.equal(2);
         done();
-      }, 100);
+      });
     });
 
 
     it('responds to window scroll and returns x and y', function(done) {
-      foo.on(window, 'scroll.namespaced', function(event) {
+      Skin.once(window, 'scroll.namespaced', function(event) {
         expect(event.x).to.be.a('number');
         expect(event.y).to.be.a('number');
         done();
       });
 
-      var timeout = setTimeout(function() {
-        clearTimeout(timeout);
-        timeout = null;
+      Skin.once('respond.window', function() {
         simulate(window, 'scroll');
-      }, 100);
+      });
     });
 
 

@@ -157,6 +157,6 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
   }
 
 
-  var Gesture = Skin.Responders.Gesture = { add: add, remove: remove };
+  var Gesture = Tools.extend(Skin.Responders.Gesture, { add: add, remove: remove });
   return Gesture;
 });

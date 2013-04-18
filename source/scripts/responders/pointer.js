@@ -254,6 +254,6 @@ define('responders/pointer', ['skin'], function(Skin) {
   }
 
 
-  var Pointer = Skin.Responders.Pointer = { add: add, remove: remove };
+  var Pointer = Tools.extend(Skin.Responders.Pointer, { add: add, remove: remove });
   return Pointer;
 });
