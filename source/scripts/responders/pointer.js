@@ -10,16 +10,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   // hooks for mouse, pen or touch events
   // supports pointerdown, pointerup, pointermove, pointercancel, pointerover, pointerout, pointerenter, pointerleave
 
-  var w = window, d = document, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = []
-    , regexDown      = /(start|down)$/i
-    , regexMove      = /move$/i
-    , regexUp        = /(up|end)$/i
-    , regexCancel    = /cancel$/i
-    // TODO: check with MSPointerOver and MSPointerOut
-    , regexOver      = /^mouseover$/
-    , regexOut       = /^mouseout$/
-    , regexEnter     = /^mouseenter$/
-    , regexLeave     = /^mouseleave$/
+  var w = window, d = document, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = [], events = {}
     , POINTER_DOWN   = 'pointerdown'
     , POINTER_UP     = 'pointerup'
     , POINTER_MOVE   = 'pointermove'
@@ -27,33 +18,45 @@ define('responders/pointer', ['skin'], function(Skin) {
     , POINTER_OVER   = 'pointerover'
     , POINTER_OUT    = 'pointerout'
     , POINTER_ENTER  = 'pointerenter'
-    , POINTER_LEAVE  = 'pointerleave'
-    , MOUSE_DOWN     = 'mousedown'
-    , MOUSE_UP       = 'mouseup'
-    , MOUSE_MOVE     = 'mousemove'
-    , MOUSE_OVER     = 'mouseover'
-    , MOUSE_OUT      = 'mouseout'
-    , MOUSE_ENTER    = 'mouseenter'
-    , MOUSE_LEAVE    = 'mouseleave'
-    , TOUCH_START    = 'touchstart'
-    , TOUCH_END      = 'touchend'
-    , TOUCH_MOVE     = 'touchmove'
-    , TOUCH_CANCEL   = 'touchcancel';
+    , POINTER_LEAVE  = 'pointerleave';
 
   // check if browser supports an event
-  function isSupported(name) {
-    var element = d.createElement('div'), cache = {}, flag;
-    name = 'on' + name;
-    if (cache[name]) return cache[name];
-    flag = (name in element);
+  function isSupported(type) {
+    var element = d.createElement('div'), flag;
+    type = 'on' + type;
+    flag = (type in element);
     if (!flag) {
-      element.setAttribute(name, 'return;');
-      flag = typeof element[name] === 'function';
+      element.setAttribute(type, 'return;');
+      flag = Tools.isFunction(element[type]);
     }
     element = null;
-    cache[name] = flag;
     return flag;
   }
+
+  // cache browser supported events map to pointer events and vice versa
+  var tests = {};
+  tests[POINTER_DOWN]   = ['touchstart', 'MSPointerDown', 'mousedown'];
+  tests[POINTER_UP]     = ['touchend', 'MSPointerUp', 'mouseup'];
+  tests[POINTER_MOVE]   = ['touchmove', 'MSPointerMove', 'mousemove'];
+  tests[POINTER_CANCEL] = ['touchcancel', 'MSPointerCancel'];
+  tests[POINTER_ENTER]  = ['mouseenter', 'mouseover'];
+  tests[POINTER_LEAVE]  = ['mouseleave', 'mouseout'];
+  tests[POINTER_OVER]   = ['mouseover'];
+  tests[POINTER_OUT]    = ['mouseout'];
+  Tools.each(tests, function(types, name) {
+    if (isSupported(name)) events[name] = name;
+    else {
+      events[name] = null;
+      Tools.each(types, function(type) {
+        if (isSupported(type)) {
+          events[name] = type;
+          events[type] = name;
+          return false;
+        }
+      });
+    }
+  });
+  tests = null;
 
   function contains(parent, child) {
     var pointer = child.parentNode;
@@ -91,75 +94,14 @@ define('responders/pointer', ['skin'], function(Skin) {
     };
   }
 
-  // find supported event type based on name
-  function typeOfName(name) {
-    switch (name) {
-      case POINTER_DOWN:
-        return isSupported(POINTER_DOWN) ? POINTER_DOWN
-             : isSupported(TOUCH_START) ? TOUCH_START
-             : n.msPointerEnabled ? 'MSPointerDown'
-             : MOUSE_DOWN;
-
-      case POINTER_UP:
-        return isSupported(POINTER_UP) ? POINTER_UP
-             : isSupported(TOUCH_END) ? TOUCH_END
-             : n.msPointerEnabled ? 'MSPointerUp'
-             : MOUSE_UP;
-
-      case POINTER_MOVE:
-        return isSupported(POINTER_MOVE) ? POINTER_MOVE
-             : isSupported(TOUCH_MOVE) ? TOUCH_MOVE
-             : n.msPointerEnabled ? 'MSPointerMove'
-             : MOUSE_MOVE;
-
-      // touch only
-      case POINTER_CANCEL:
-        return isSupported(POINTER_CANCEL) ? POINTER_CANCEL
-             : isSupported(TOUCH_CANCEL) ? TOUCH_CANCEL
-             : n.msPointerEnabled ? 'MSPointerCancel'
-             : null;
-
-      // mouse only
-      case POINTER_ENTER:
-        return isSupported(MOUSE_ENTER) ? MOUSE_ENTER
-             : MOUSE_OVER;
-
-      case POINTER_LEAVE:
-        return isSupported(MOUSE_LEAVE) ? MOUSE_LEAVE
-             : MOUSE_OUT;
-
-      case POINTER_OVER:
-       return MOUSE_OVER;
-
-      case POINTER_OUT:
-       return MOUSE_OUT;
-
-      default:
-        return null;
-    }
-  }
-
-  // find standard event name based on type
-  function nameOfType(type) {
-    return regexMove.test(type)   ? POINTER_MOVE
-         : regexOver.test(type)   ? POINTER_OVER
-         : regexOut.test(type)    ? POINTER_OUT
-         : regexEnter.test(type)  ? POINTER_ENTER
-         : regexLeave.test(type)  ? POINTER_LEAVE
-         : regexDown.test(type)   ? POINTER_DOWN
-         : regexUp.test(type)     ? POINTER_UP
-         : regexCancel.test(type) ? POINTER_CANCEL
-         : null;
-  }
-
   // add listener
   // listener is used by more complex responders, gestures
-  function add(element, name, context, listener) {
-    var type = typeOfName(name);
+  function add(element, name, context, listener, capture) {
+    var type = events[name];
     if (type) {
       if (listener) {
         // handled by other responders
-        element.addEventListener(type, listener, false);
+        element.addEventListener(type, listener, capture || false);
       } else {
         var path = Tools.indexFor(indices, element) + '.' + name;
         if (hub[path]) {
@@ -178,7 +120,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     Tools.each(hub, function(contexts, path) {
       Tools.reject(contexts, function(which) { return which === context; });
       if (!contexts.length) {
-        var type  = typeOfName(path.split('.')[1])
+        var type  = events[path.split('.')[1]]
           , index = path.split('.')[0];
         element.removeEventListener(type, handle);
         delete hub[path];
@@ -193,7 +135,7 @@ define('responders/pointer', ['skin'], function(Skin) {
 
   function remove(element, name, context, listener) {
     if (!name.length) { clear(element, context); return; }
-    var type = typeOfName(name);
+    var type = events[name];
     if (type) {
       if (listener) {
         // handled by other responders
@@ -221,7 +163,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     var target     = event.currentTarget
       , source     = event.target
       , related    = event.relatedTarget
-      , name       = nameOfType(event.type)
+      , name       = events[event.type]
       , index      = Tools.indexFor(indices, source) + '.';
 
     if (!related || (related !== target && !contains(target, related))) {
