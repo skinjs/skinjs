@@ -192,6 +192,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   }
 
   function remove(element, name, context, listener) {
+    if (!name.length) { clear(element, context); return; }
     var type = typeOfName(name);
     if (type) {
       if (listener) {
@@ -217,40 +218,27 @@ define('responders/pointer', ['skin'], function(Skin) {
   }
 
   function handle(event) {
-    var target  = event.currentTarget
-      , source  = event.target
-      , related = event.relatedTarget
-      , name    = nameOfType(event.type)
-      , index   = Tools.indexFor(indices, source) + '.';
+    var target     = event.currentTarget
+      , source     = event.target
+      , related    = event.relatedTarget
+      , name       = nameOfType(event.type)
+      , index      = Tools.indexFor(indices, source) + '.';
 
-    // TODO: this needs lots of refactoring
-    if (name === POINTER_OVER && !isSupported(MOUSE_ENTER)) {
-      if (hub[index + POINTER_ENTER] && (!related || (related !== target && !contains(target, related)))) {
-        Tools.each(hub[index + POINTER_ENTER], function(context) {
-          context.trigger(source, POINTER_ENTER, { x: event.clientX, y: event.clientY, event: event });
-        });
-      }
-      if (hub[index + POINTER_OVER] && source === target) {
-        Tools.each(hub[index + POINTER_OVER], function(context) {
-          context.trigger(source, POINTER_OVER, { x: event.clientX, y: event.clientY, event: event });
-        });
-      }
-    } else if (name === POINTER_OUT && !isSupported(MOUSE_LEAVE)) {
-      if (hub[index + POINTER_LEAVE] && (!related || (related !== target && !contains(target, related)))) {
-        Tools.each(hub[index + POINTER_LEAVE], function(context) {
-          context.trigger(source, POINTER_LEAVE, { x: event.clientX, y: event.clientY, event: event });
-        });
-      }
-      if (hub[index + POINTER_OUT] && source === target) {
-        Tools.each(hub[index + POINTER_OUT], function(context) {
-          context.trigger(source, POINTER_OUT, { x: event.clientX, y: event.clientY, event: event });
-        });
+    if (!related || (related !== target && !contains(target, related))) {
+      if (name === POINTER_OVER) {
+        trigger(hub[index + POINTER_OVER], source, POINTER_OVER, event);
+        trigger(hub[index + POINTER_ENTER], source, POINTER_ENTER, event);
+      } else if (name === POINTER_OUT) {
+        trigger(hub[index + POINTER_OUT], source, POINTER_OUT, event);
+        trigger(hub[index + POINTER_LEAVE], source, POINTER_LEAVE, event);
       }
     } else if (source === target) {
-      Tools.each(hub[index + name], function(context) {
-        context.trigger(source, name, { x: event.clientX, y: event.clientY, event: event });
-      });
+      trigger(hub[index + name], source, name, event);
     }
+  }
+
+  function trigger(contexts, source, name, event) {
+    Tools.each(contexts, function(context) { context.trigger(source, name, event); });
   }
 
 
