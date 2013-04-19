@@ -9,13 +9,37 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
   // ========================
   // hooks for mouse, pen or touch events
   // supports press, doublepress, longpress, controlpress,
-  //          drag, dragstart, dragover, dragout, dragend, drop,
+  //          drag, dragstart, dragover, dragout, dragenter, dragleave, dragend, drop,
   //          swipestart, swipe, swipeend
   //          panstart, pan, panend
   //          rotatestart, rotate, rotateend
   //          pinchstart, pinch, pinchend
 
-  var w = window, Tools = Skin.Tools, hub = {}, indices = [], upTimeout = 500, downTimeout = 1000, timeout = null, gesture = {};
+  var w = window, Tools = Skin.Tools, hub = {}, indices = [], upTimeout = 500, downTimeout = 1000, timeout = null, gesture = {}
+    , PRESS         = 'press'
+    , DOUBLE_PRESS  = 'doublepress'
+    , LONG_PRESS    = 'longpress'
+    , CONTROL_PRESS = 'controlpress'
+    , DRAG          = 'drag'
+    , DRAG_START    = 'dragstart'
+    , DRAG_OVER     = 'dragover'
+    , DRAG_OUT      = 'dragout'
+    , DRAG_ENTER    = 'dragenter'
+    , DRAG_LEAVE    = 'dragleave'
+    , DRAG_END      = 'dragend'
+    , DROP          = 'drop'
+    , SWIPE         = 'swipe'
+    , SWIPE_START   = 'swipestart'
+    , SWIPE_END     = 'swipeend'
+    , PAN           = 'pan'
+    , PAN_START     = 'panstart'
+    , PAN_END       = 'panend'
+    , ROTATE        = 'rotate'
+    , ROTATE_START  = 'rotatestart'
+    , ROTATE_END    = 'rotateend'
+    , PINCH         = 'pinch'
+    , PINCH_START   = 'pinchstart'
+    , PINCH_END     = 'pinchend';
 
   // prevent default browser actions
   function prevent(event) {
@@ -77,13 +101,12 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
   }
 
   function down(event) {
-    event.stopPropagation();
-
     var pointers = event.touches || [event]
-      , element  = pointers[0].target
-      , index    = Tools.indexFor(indices, element) + '.';
+      , source   = pointers[0].target
+      , index    = Tools.indexFor(indices, source) + '.';
 
-    if (element !== gesture.element) gesture = { element: element };
+    // clear gesture, if there's a new source
+    if (source !== gesture.source) gesture = { source: source };
 
     // single touch and mouse events, press, drag, pan, swipe
     if (pointers.length === 1) {
@@ -103,7 +126,7 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
       if (hub[index + 'longpress']) {
         if (timeout) w.clearTimeout(timeout);
         timeout = w.setTimeout(function() {
-          Tools.each(hub[index + 'longpress'], function(context) { context.trigger(element, 'longpress', {}); });
+          Tools.each(hub[index + 'longpress'], function(context) { context.trigger(source, 'longpress', {}); });
           timeout = null;
         }, downTimeout);
       }
