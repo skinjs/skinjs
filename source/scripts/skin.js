@@ -142,6 +142,7 @@
   // register default responders
   Tools.each({
     Window:   function(emitter, name, context) { return emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name); },
+    Document: function(emitter, name, context) { return emitter === document && /^(contextmenu|ready)$/.test(name); },
     Keyboard: function(emitter, name, context) { return Tools.isElement(emitter) && /^key(press|up|down)/.test(name); },
     Pointer:  function(emitter, name, context) { return Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name); },
     Gesture:  function(emitter, name, context) { return Tools.isElement(emitter) && /^((double|long|control){0,1}press|drop|drag(start|end|enter|leave|over|out){0,1}|(swipe|rotate|pinch)(start|end){0,1})$/.test(name); }
