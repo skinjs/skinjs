@@ -24,10 +24,12 @@ define('responders/gesture', ['skin'], function(Skin) {
     , POINTER_OUT    = 'pointerout'
     , POINTER_ENTER  = 'pointerenter'
     , POINTER_LEAVE  = 'pointerleave'
+
     , PRESS          = 'press'
     , DOUBLE_PRESS   = 'doublepress'
     , LONG_PRESS     = 'longpress'
     , CONTROL_PRESS  = 'controlpress'
+
     , DRAG           = 'drag'
     , DRAG_START     = 'dragstart'
     , DRAG_OVER      = 'dragover'
@@ -36,47 +38,63 @@ define('responders/gesture', ['skin'], function(Skin) {
     , DRAG_LEAVE     = 'dragleave'
     , DRAG_END       = 'dragend'
     , DROP           = 'drop'
+
     , SWIPE          = 'swipe'
     , SWIPE_START    = 'swipestart'
     , SWIPE_END      = 'swipeend'
+
     , PAN            = 'pan'
     , PAN_START      = 'panstart'
     , PAN_END        = 'panend'
+
     , ROTATE         = 'rotate'
     , ROTATE_START   = 'rotatestart'
     , ROTATE_END     = 'rotateend'
+
     , PINCH          = 'pinch'
     , PINCH_START    = 'pinchstart'
     , PINCH_END      = 'pinchend';
 
   function add(element, name, context) {
-    var path = Tools.indexFor(indices, element) + '.' + name;
-    if (hub[path]) {
-      hub[path].push(context);
+    var index = Tools.indexFor(indices, element)
+      , path  = hub[index] || (hub[index] = {});
+    if (path[name]) {
+      path[name].push(context);
     } else {
-      hub[path] = [context];
+      path[name] = [context];
       context.on(element, 'pointerdown', start);
       context.on(element, 'pointerup', end);
       context.on(element, 'pointercancel', cancel);
+      if (name == 'dragenter') context.on(element, 'pointerenter', enter);
+      else if (name == 'dragleave') context.on(element, 'pointerleave', leave);
+      else if (name == 'dragover') context.on(element, 'pointerenter', over);
+      else if (name == 'dragout') context.on(element, 'pointerenter', out);
+      else if (!/press$/.test(name)) context.on(element, 'pointermove', move);
     }
   }
 
   function remove(element, name, context) {
 //    if (!name.length) { clear(element, context); return; }
     var index = Tools.indexFor(indices, element)
-      , path  = index + '.' + name;
-    if (hub[path]) {
-      Tools.remove(hub[path], context);
-      if (!hub[path].length) {
+      , path  = hub[index][name];
+    if (path[name]) {
+      Tools.remove(path[name], context);
+      if (!path[name].length) {
         context.off(element, 'pointerdown', start);
         context.off(element, 'pointerup', end);
         context.off(element, 'pointercancel', cancel);
-        delete hub[path];
+        if (name == 'dragenter') context.off(element, 'pointerenter', enter);
+        else if (name == 'dragleave') context.off(element, 'pointerleave', leave);
+        else if (name == 'dragover') context.off(element, 'pointerenter', over);
+        else if (name == 'dragout') context.off(element, 'pointerenter', out);
+        else if (!/press$/.test(name)) context.off(element, 'pointermove', move);
+        delete path[name];
         // check if any other handlers available for the element
         // if not, remove the element from indices
-        var keys = Tools.keys(hub), exist;
-        Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
-        if (!exist) delete indices[index];
+        if (Tools.isEmpty(path)) {
+          delete hub[index];
+          delete indices[index];
+        }
       }
     }
   }
@@ -84,7 +102,8 @@ define('responders/gesture', ['skin'], function(Skin) {
   function start(event) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source) + '.'
+      , index    = Tools.indexFor(indices, source)
+      , path     = hub[index]
       , now      = Date.now()
       , delay;
 
@@ -94,20 +113,20 @@ define('responders/gesture', ['skin'], function(Skin) {
     // single touch and mouse events, press, drag, swipe
     if (pointers.length === 1) {
 
-      if (hub[index + 'doublepress']) {
-        if (!gesture.press) gesture.press = 1;
-        else gesture.press++;
+      if (path[DOUBLE_PRESS]) {
+        if (!gesture.presses) gesture.presses = 1;
+        else gesture.presses++;
       }
 
-      if (hub[index + 'controlpress']) {
-        if (isControlPress(event)) trigger(hub[index + 'controlpress'], source, 'controlpress', event);
+      if (path[CONTROL_PRESS]) {
+        if (isControlPress(event)) trigger(path[CONTROL_PRESS], source, CONTROL_PRESS, event);
       }
 
-      if (hub[index + 'longpress']) {
+      if (path[LONG_PRESS]) {
         if (!isControlPress(event)) {
           if (timeout) w.clearTimeout(timeout);
           timeout = w.setTimeout(function() {
-            trigger(hub[index + 'longpress'], source, 'longpress', event);
+            trigger(path[LONG_PRESS], source, LONG_PRESS, event);
             timeout = null;
           }, downTimeout);
         }
@@ -115,13 +134,11 @@ define('responders/gesture', ['skin'], function(Skin) {
     }
   }
 
-  function move(event) {
-  }
-
   function end(event) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source) + '.'
+      , index    = Tools.indexFor(indices, source)
+      , path     = hub[index]
       , now      = Date.now()
       , delay;
 
@@ -130,24 +147,41 @@ define('responders/gesture', ['skin'], function(Skin) {
       // single touch and mouse events, press, drag, swipe
       if (pointers.length === 1) {
 
-        if (hub[index + 'press']) trigger(hub[index + 'press'], source, 'press', event);
+        if (path[PRESS]) trigger(path[PRESS], source, PRESS, event);
 
-        if (hub[index + 'doublepress']) {
-          if (gesture.press === 2 && now - gesture.time < upTimeout) {
-            trigger(hub[index + 'doublepress'], source, 'doublepress', event);
+        if (path[DOUBLE_PRESS]) {
+          if (gesture.presses === 2 && now - gesture.time < upTimeout) {
+            trigger(path[DOUBLE_PRESS], source, DOUBLE_PRESS, event);
           }
         }
 
-        if (hub[index + 'longpress'] && timeout) {
+        if (path[LONG_PRESS] && timeout) {
           w.clearTimeout(timeout);
           timeout = null;
         }
-
       }
     }
   }
 
+  function enter(event) {
+    
+  }
+
+  function leave(event) {
+    
+  }
+
+  function over(event) {
+  }
+
+  function out(event) {
+  }
+
+  function move(event) {
+  }
+
   function cancel(event) {
+    gesture = {};
   }
 
   // trigger all listening contexts

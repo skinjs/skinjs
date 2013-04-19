@@ -66,6 +66,14 @@
     }
   };
 
+  // check if array, string or object is empty
+  Tools.isEmpty = function(target) {
+    if (target === null) return true;
+    if (Tools.isArray(target) || Tools.isString(target)) return target.length === 0;
+    for (var key in target) if (Tools.objectHas(target, key)) return false;
+    return true;
+  };
+
   // recursive extend, also removes a property from target if it is explicitly set to undefined in source
   Tools.extend = function(target) {
     Tools.each(Tools.arraySlice.call(arguments, 1), function(source) {
