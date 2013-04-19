@@ -21,7 +21,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     , POINTER_LEAVE  = 'pointerleave';
 
   // check if browser supports an event
-  function isSupported(type) {
+  var isSupported = function(type) {
     var element = d.createElement('div'), flag;
     type = 'on' + type;
     flag = (type in element);
@@ -31,7 +31,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     }
     element = null;
     return flag;
-  }
+  };
 
   // cache browser supported events map to pointer events and vice versa
   var tests = {};
@@ -56,8 +56,11 @@ define('responders/pointer', ['skin'], function(Skin) {
       });
     }
   });
-  tests = null;
+  tests = isSupported = null;
 
+  // check if a DOM node contains other
+  // used for faking pointerenter and pointerleave
+  // where they are not supported
   function contains(parent, child) {
     var pointer = child.parentNode;
     while (pointer !== null) {
@@ -67,17 +70,6 @@ define('responders/pointer', ['skin'], function(Skin) {
     return false;
   }
 
-  // get a nested element's offset, according to document
-  function offset(element) {
-    var x = 0, y = 0, pointer = element;
-    while (pointer !== null) {
-      x += pointer.offsetLeft;
-      y += pointer.offsetTop;
-      pointer = pointer.offsetParent;
-    }
-    return { x: x, y: y };
-  }
-
   // prevent default browser actions
   function prevent(event) {
     if (event.preventDefault) event.preventDefault();
@@ -85,30 +77,37 @@ define('responders/pointer', ['skin'], function(Skin) {
     if (event.preventMouseEvent) event.preventMouseEvent();
   }
 
-  // ensure coordinate is inside the element
-  function sanitizeCoordinate(element, coordinate) {
-    var offset = offset(element);
-    return {
-      x: Math.max(0, Math.min(coordinate.x - offset.x, element.offsetWidth))
-    , y: Math.max(0, Math.min(coordinate.y - offset.y, element.offsetHeight))
-    };
-  }
-
   // add listener
-  // listener is used by more complex responders, gestures
-  function add(element, name, context, listener, capture) {
+  function add(element, name, context) {
     var type = events[name];
     if (type) {
-      if (listener) {
-        // handled by other responders
-        element.addEventListener(type, listener, capture || false);
+      var path = Tools.indexFor(indices, element) + '.' + name;
+      if (hub[path]) {
+        hub[path].push(context);
       } else {
-        var path = Tools.indexFor(indices, element) + '.' + name;
-        if (hub[path]) {
-          hub[path].push(context);
-        } else {
-          hub[path] = [context];
-          element.addEventListener(type, handle, false);
+        hub[path] = [context];
+        element.addEventListener(type, handle, false);
+      }
+    }
+  }
+
+  // remove listener
+  function remove(element, name, context) {
+    if (!name.length) { clear(element, context); return; }
+    var type = events[name];
+    if (type) {
+      var index = Tools.indexFor(indices, element)
+        , path  = index + '.' + name;
+      if (hub[path]) {
+        Tools.remove(hub[path], context);
+        if (!hub[path].length) {
+          element.removeEventListener(type, handle);
+          delete hub[path];
+          // check if any other handlers available for the element
+          // if not, remove the element from indices
+          var keys = Tools.keys(hub), exist;
+          Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
+          if (!exist) delete indices[index];
         }
       }
     }
@@ -133,32 +132,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     });
   }
 
-  function remove(element, name, context, listener) {
-    if (!name.length) { clear(element, context); return; }
-    var type = events[name];
-    if (type) {
-      if (listener) {
-        // handled by other responders
-        element.removeEventListener(type, listener);
-      } else {
-        var index = Tools.indexFor(indices, element) + '.'
-          , path  = index + name;
-        if (hub[path]) {
-          Tools.remove(hub[path], context);
-          if (!hub[path].length) {
-            element.removeEventListener(type, handle);
-            delete hub[path];
-            // check if any other handlers available for the element
-            // if not, remove the element from indices
-            var keys = Tools.keys(hub), exist;
-            Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
-            if (!exist) delete indices[parseInt(index, 10)];
-          }
-        }
-      }
-    }
-  }
-
+  // handle pointer events
   function handle(event) {
     var target     = event.currentTarget
       , source     = event.target
@@ -177,6 +151,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     }
   }
 
+  // trigger all listening contexts
   function trigger(contexts, source, name, event) {
     Tools.each(contexts, function(context) { context.trigger(source, name, event); });
   }

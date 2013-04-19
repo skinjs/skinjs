@@ -3,7 +3,7 @@
 // Skin.js may be freely distributed under the MIT license
 // http://skinjs.org
 
-define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, Skin) {
+define('responders/gesture', ['skin'], function(Skin) {
 
   // Gesture Responder Module
   // ========================
@@ -16,37 +16,38 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
   //          pinchstart, pinch, pinchend
 
   var w = window, Tools = Skin.Tools, hub = {}, indices = [], upTimeout = 500, downTimeout = 1000, timeout = null, gesture = {}
-    , PRESS         = 'press'
-    , DOUBLE_PRESS  = 'doublepress'
-    , LONG_PRESS    = 'longpress'
-    , CONTROL_PRESS = 'controlpress'
-    , DRAG          = 'drag'
-    , DRAG_START    = 'dragstart'
-    , DRAG_OVER     = 'dragover'
-    , DRAG_OUT      = 'dragout'
-    , DRAG_ENTER    = 'dragenter'
-    , DRAG_LEAVE    = 'dragleave'
-    , DRAG_END      = 'dragend'
-    , DROP          = 'drop'
-    , SWIPE         = 'swipe'
-    , SWIPE_START   = 'swipestart'
-    , SWIPE_END     = 'swipeend'
-    , PAN           = 'pan'
-    , PAN_START     = 'panstart'
-    , PAN_END       = 'panend'
-    , ROTATE        = 'rotate'
-    , ROTATE_START  = 'rotatestart'
-    , ROTATE_END    = 'rotateend'
-    , PINCH         = 'pinch'
-    , PINCH_START   = 'pinchstart'
-    , PINCH_END     = 'pinchend';
-
-  // prevent default browser actions
-  function prevent(event) {
-    if (event.preventDefault) event.preventDefault();
-    if (event.preventManipulation) event.preventManipulation();
-    if (event.preventMouseEvent) event.preventMouseEvent();
-  }
+    , POINTER_DOWN   = 'pointerdown'
+    , POINTER_UP     = 'pointerup'
+    , POINTER_MOVE   = 'pointermove'
+    , POINTER_CANCEL = 'pointercancel'
+    , POINTER_OVER   = 'pointerover'
+    , POINTER_OUT    = 'pointerout'
+    , POINTER_ENTER  = 'pointerenter'
+    , POINTER_LEAVE  = 'pointerleave'
+    , PRESS          = 'press'
+    , DOUBLE_PRESS   = 'doublepress'
+    , LONG_PRESS     = 'longpress'
+    , CONTROL_PRESS  = 'controlpress'
+    , DRAG           = 'drag'
+    , DRAG_START     = 'dragstart'
+    , DRAG_OVER      = 'dragover'
+    , DRAG_OUT       = 'dragout'
+    , DRAG_ENTER     = 'dragenter'
+    , DRAG_LEAVE     = 'dragleave'
+    , DRAG_END       = 'dragend'
+    , DROP           = 'drop'
+    , SWIPE          = 'swipe'
+    , SWIPE_START    = 'swipestart'
+    , SWIPE_END      = 'swipeend'
+    , PAN            = 'pan'
+    , PAN_START      = 'panstart'
+    , PAN_END        = 'panend'
+    , ROTATE         = 'rotate'
+    , ROTATE_START   = 'rotatestart'
+    , ROTATE_END     = 'rotateend'
+    , PINCH          = 'pinch'
+    , PINCH_START    = 'pinchstart'
+    , PINCH_END      = 'pinchend';
 
   function add(element, name, context) {
     var path = Tools.indexFor(indices, element) + '.' + name;
@@ -54,81 +55,62 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
       hub[path].push(context);
     } else {
       hub[path] = [context];
-      Pointer.add(element, 'pointerdown', this, down);
-      Pointer.add(element, 'pointerup', this, up);
-      Pointer.add(element, 'pointercancel', this, cancel);
-      if (!/press$/.test(name)) {
-        Pointer.add(element, 'pointermove', this, move);
-      }
+      context.on(element, 'pointerdown', start);
+      context.on(element, 'pointerup', end);
+      context.on(element, 'pointercancel', cancel);
     }
   }
 
   function remove(element, name, context) {
-    // special case, when there's no name it means
-    // all handlers for the specified context should be removed
-    // this is when something like context.off(element) was used
-    if (!name.length) {
-      Tools.each(hub, function(contexts, path) {
-        Tools.reject(contexts, function(which) { return which === context; });
-        if (!contexts.length) {
-          Pointer.remove(element, 'pointerdown', this, down);
-          Pointer.remove(element, 'pointerup', this, up);
-          Pointer.remove(element, 'pointercancel', this, cancel);
-          if (!/press$/.test(path)) {
-            Pointer.remove(element, 'pointermove', this, move);
-          }
-          delete hub[path];
-        }
-      });
-      return;
-    }
-
-    // normal case, name is specified
-    var path = Tools.indexFor(indices, element) + '.' + name;
+//    if (!name.length) { clear(element, context); return; }
+    var index = Tools.indexFor(indices, element)
+      , path  = index + '.' + name;
     if (hub[path]) {
       Tools.remove(hub[path], context);
       if (!hub[path].length) {
-        Pointer.remove(element, 'pointerdown', this, down);
-        Pointer.remove(element, 'pointerup', this, up);
-        Pointer.remove(element, 'pointercancel', this, cancel);
-        if (!/press$/.test(name)) {
-          Pointer.remove(element, 'pointermove', this, move);
-        }
+        context.off(element, 'pointerdown', start);
+        context.off(element, 'pointerup', end);
+        context.off(element, 'pointercancel', cancel);
         delete hub[path];
+        // check if any other handlers available for the element
+        // if not, remove the element from indices
+        var keys = Tools.keys(hub), exist;
+        Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
+        if (!exist) delete indices[index];
       }
     }
-
   }
 
-  function down(event) {
-    var pointers = event.touches || [event]
+  function start(event) {
+    var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source) + '.';
+      , index    = Tools.indexFor(indices, source) + '.'
+      , now      = Date.now()
+      , delay;
 
-    // clear gesture, if there's a new source
-    if (source !== gesture.source) gesture = { source: source };
+    // start new gesture, if there's a new source or a big time gap
+    if (source !== gesture.source || now - gesture.time > upTimeout) gesture = { source: source, time: now };
 
-    // single touch and mouse events, press, drag, pan, swipe
+    // single touch and mouse events, press, drag, swipe
     if (pointers.length === 1) {
 
       if (hub[index + 'doublepress']) {
-        gesture.time = Date.now();
-        if (!gesture.count) gesture.count = 1;
-        else gesture.count++;
+        if (!gesture.press) gesture.press = 1;
+        else gesture.press++;
       }
+
       if (hub[index + 'controlpress']) {
-        prevent(event);
-        gesture.control = event.which ? event.which == 3
-                        : event.button ? event.button == 2
-                        : (event.ctrlKey || event.altKey) ? true
-                        : false;
+        if (isControlPress(event)) trigger(hub[index + 'controlpress'], source, 'controlpress', event);
       }
+
       if (hub[index + 'longpress']) {
-        if (timeout) w.clearTimeout(timeout);
-        timeout = w.setTimeout(function() {
-          Tools.each(hub[index + 'longpress'], function(context) { context.trigger(source, 'longpress', {}); });
-          timeout = null;
-        }, downTimeout);
+        if (!isControlPress(event)) {
+          if (timeout) w.clearTimeout(timeout);
+          timeout = w.setTimeout(function() {
+            trigger(hub[index + 'longpress'], source, 'longpress', event);
+            timeout = null;
+          }, downTimeout);
+        }
       }
     }
   }
@@ -136,36 +118,26 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
   function move(event) {
   }
 
-  function up(event) {
-    event.stopPropagation();
+  function end(event) {
+    var pointers = event.changedTouches || [event]
+      , source   = pointers[0].target
+      , index    = Tools.indexFor(indices, source) + '.'
+      , now      = Date.now()
+      , delay;
 
-    var pointers = event.touches || [event]
-      , element  = pointers[0].target
-      , index    = Tools.indexFor(indices, element) + '.';
+    if (source === gesture.source) {
 
-    if (element === gesture.element) {
-
-      // single touch and mouse events, press, drag, pan, swipe
+      // single touch and mouse events, press, drag, swipe
       if (pointers.length === 1) {
 
-        if (hub[index + 'press']) {
-          Tools.each(hub[index + 'press'], function(context) { context.trigger(element, 'press', {}); });
-        }
+        if (hub[index + 'press']) trigger(hub[index + 'press'], source, 'press', event);
+
         if (hub[index + 'doublepress']) {
-          if (gesture.count === 2 && Date.now() - gesture.time < upTimeout) {
-            Tools.each(hub[index + 'doublepress'], function(context) { context.trigger(element, 'doublepress', {}); });
-            gesture = {};
+          if (gesture.press === 2 && now - gesture.time < upTimeout) {
+            trigger(hub[index + 'doublepress'], source, 'doublepress', event);
           }
         }
-        if (hub[index + 'controlpress']) {
-          if (gesture.control) {
-            var control = event.which ? event.which == 3
-                        : event.button ? event.button == 2
-                        : (event.ctrlKey || event.altKey) ? true
-                        : false;
-            if (control) Tools.each(hub[index + 'controlpress'], function(context) { context.trigger(element, 'controlpress', {}); });
-          }
-        }
+
         if (hub[index + 'longpress'] && timeout) {
           w.clearTimeout(timeout);
           timeout = null;
@@ -176,8 +148,22 @@ define('responders/gesture', ['responders/pointer', 'skin'], function(Pointer, S
   }
 
   function cancel(event) {
-    
   }
+
+  // trigger all listening contexts
+  function trigger(contexts, source, name, event) {
+    Tools.each(contexts, function(context) { context.trigger(source, name, event); });
+  }
+
+  // define control press, right-click, control-click
+  function isControlPress(event) {
+    return event.ctrlKey ? true
+         : event.which ? event.which == 3
+         : event.button ? event.button == 2
+         : false;
+  }
+
+
 
 
   var Gesture = Tools.extend(Skin.Responders.Gesture, { add: add, remove: remove });
