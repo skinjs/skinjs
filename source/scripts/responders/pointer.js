@@ -128,7 +128,7 @@ define('responders/pointer', ['skin'], function(Skin) {
         // if not, remove the element from indices
         var keys = Tools.keys(hub), exist;
         Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
-        if (!exist) Tools.remove(indices, element);
+        if (!exist) delete indices[parseInt(index, 10)];
       }
     });
   }
@@ -152,7 +152,7 @@ define('responders/pointer', ['skin'], function(Skin) {
             // if not, remove the element from indices
             var keys = Tools.keys(hub), exist;
             Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
-            if (!exist) Tools.remove(indices, element);
+            if (!exist) delete indices[parseInt(index, 10)];
           }
         }
       }
@@ -164,17 +164,15 @@ define('responders/pointer', ['skin'], function(Skin) {
       , source     = event.target
       , related    = event.relatedTarget
       , name       = events[event.type]
-      , index      = Tools.indexFor(indices, source) + '.';
+      , index      = Tools.indexFor(indices, target) + '.';
 
-    if (!related || (related !== target && !contains(target, related))) {
-      if (name === POINTER_OVER) {
-        trigger(hub[index + POINTER_OVER], source, POINTER_OVER, event);
-        trigger(hub[index + POINTER_ENTER], source, POINTER_ENTER, event);
-      } else if (name === POINTER_OUT) {
-        trigger(hub[index + POINTER_OUT], source, POINTER_OUT, event);
-        trigger(hub[index + POINTER_LEAVE], source, POINTER_LEAVE, event);
-      }
-    } else if (source === target) {
+    // simulate pointerenter and pointerleave using pointerover and pointerout
+    if ((name == POINTER_OVER && events[POINTER_OVER] == events[POINTER_ENTER]) && (!related || (related !== target && !contains(target, related))))
+      trigger(hub[index + POINTER_ENTER], source, POINTER_ENTER, event);
+    if ((name == POINTER_OUT && events[POINTER_OUT] == events[POINTER_LEAVE]) && (!related || (related !== target && !contains(target, related))))
+      trigger(hub[index + POINTER_LEAVE], source, POINTER_LEAVE, event);
+
+    if (source === target) {
       trigger(hub[index + name], source, name, event);
     }
   }

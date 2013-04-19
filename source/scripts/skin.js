@@ -260,7 +260,7 @@
       // if not, remove the emitter from indices
       keys = Tools.keys(hub);
       Tools.each(keys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
-      if (!exist) Tools.remove(indices, args.emitter);
+      if (!exist) delete indices[parseInt(args.index, 10)];
       // remove responders for external events
       respond(args.emitter, args.name, context, false);
       return context;
