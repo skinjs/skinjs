@@ -1,7 +1,8 @@
 {
   "name": "Skin.js",
-  "version": "0.1.4",
-  "description": "user interface components and styles for web applications",
+  "version": "0.1.5",
+  "description": "User interface components and styles for web applications",
+  "homepage": "http://skinjs.org",
   "main": "skin.js",
   "scripts": {
     "test": "grunt test"
@@ -25,6 +26,7 @@
     "tablet",
     "design",
     "minimal",
+    "style",
     "flexible",
     "customizable",
     "extendable",
@@ -35,10 +37,12 @@
     "css3",
     "less",
     "html5",
-    "amd"
+    "amd",
+    "modular"
   ],
   "author": "Soheil Jadidian",
   "license": "MIT",
+  "licenseNotes": "This software may be freely distributed under the MIT license",
   "readmeFilename": "README.md",
   "devDependencies": {
     "mocha": "*",
@@ -48,6 +52,7 @@
     "grunt-contrib-jshint": "~0.2.0",
     "grunt-contrib-watch": "~0.3.1",
     "grunt-contrib-uglify": "~0.1.2",
+    "grunt-replace": "~0.4.3",
     "grunt-rsync": "~0.1.0"
   }
 }

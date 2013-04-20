@@ -1,7 +1,7 @@
-// Skin.js 0.1.4
-// © 2013 Soheil Jadidian
-// Skin.js may be freely distributed under the MIT license
-// http://skinjs.org
+// @@package @@version
+// @@copyrightNotes
+// @@licenseNotes
+// @@homepage
 
 define('responders/gesture', ['skin'], function(Skin) {
 

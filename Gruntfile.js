@@ -24,6 +24,31 @@ module.exports = function(grunt) {
       }
     },
 
+    replace: {
+      options: {
+        variables: {
+          'package': '<%= pkg.name %>',
+          'description': '<%= pkg.description %>',
+          'version': '<%= pkg.version %>',
+          'author': '<%= pkg.author %>',
+          'license': '<%= pkg.license %>',
+          'licenseNotes': '<%= pkg.licenseNotes %>',
+          'copyrightNotes': '© <%= grunt.template.today("yyyy") %> <%= pkg.author %>',
+          'homepage': '<%= pkg.homepage %>',
+          'year': '<%= grunt.template.today("yyyy") %>',
+          'date': '<%= grunt.template.today("yyyy-mm-dd") %>'
+        },
+        prefix: '@@'
+      },
+      files: {
+        expand: true,
+        cwd: 'source/scripts',
+        src: ['**/*.js'],
+        dest: 'destination/scripts/',
+        ext: '.js'
+      }
+    },
+
     uglify: {
       options: {
         beautify: true,
@@ -32,7 +57,7 @@ module.exports = function(grunt) {
       },
       files: {
         expand: true,
-        cwd: 'source/scripts',
+        cwd: 'destination/scripts/',
         src: ['**/*.js'],
         dest: 'destination/scripts/',
         ext: '.js'
@@ -74,7 +99,7 @@ module.exports = function(grunt) {
 
     watch: {
       files: ['Gruntfile.js', 'source/**/*'],
-      tasks: ['less', 'jshint', 'uglify', 'rsync:styles', 'rsync:scripts']
+      tasks: ['less', 'jshint', 'replace', 'rsync:styles', 'rsync:scripts']
     }
 
   });
@@ -83,8 +108,9 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-less');
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-contrib-watch');
+  grunt.loadNpmTasks('grunt-replace');
   grunt.loadNpmTasks('grunt-rsync');
 
-  grunt.registerTask('default', ['less', 'uglify', 'rsync:styles', 'rsync:scripts']);
-  grunt.registerTask('test', ['qunit']);
+  grunt.registerTask('default', ['less', 'jshint', 'replace', 'uglify', 'rsync:styles', 'rsync:scripts']);
+  grunt.registerTask('test', ['less', 'jshint']);
 };
