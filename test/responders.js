@@ -1,30 +1,121 @@
 describe('Responders Module', function () {
 
-  var Responders = Skin.Responders;
-
-  function simulate(element, eventName) {
-    var options = extend(defaultOptions, arguments[2] || {});
-    var oEvent, eventType = null;
-    for (var name in eventMatchers) {
-      if (eventMatchers[name].test(eventName)) { eventType = name; break; }
+  var isSupported = function(type) {
+    var element = document.createElement('div'), flag;
+    type = 'on' + type;
+    flag = (type in element);
+    if (!flag) {
+      element.setAttribute(type, 'return;');
+      flag = typeof element[type] === 'function';
     }
-    if (!eventType) throw new SyntaxError('Only HTML and Mouse Event interfaces are supported for simulation');
-    if (document.createEvent) {
-      oEvent = document.createEvent(eventType);
-      if (eventType == 'HTMLEvents') {
-        oEvent.initEvent(eventName, options.bubbles, options.cancelable);
-      } else {
-        oEvent.initMouseEvent(eventName, options.bubbles, options.cancelable, document.defaultView,
-          options.button, options.pointerX, options.pointerY, options.pointerX, options.pointerY,
-          options.ctrlKey, options.altKey, options.shiftKey, options.metaKey, options.button, element);
+    element = null;
+    return flag;
+  }
+
+  var events = {}, tests = {};
+  tests['pointerdown']   = ['touchstart', 'MSPointerDown', 'mousedown'];
+  tests['pointerup']     = ['touchend', 'MSPointerUp', 'mouseup'];
+  tests['pointermove']   = ['touchmove', 'MSPointerMove', 'mousemove'];
+  tests['pointercancel'] = ['touchcancel', 'MSPointerCancel'];
+  tests['pointerover']   = ['mouseenter', 'mouseover'];
+  tests['pointerout']    = ['mouseleave', 'mouseout'];
+  tests['pointerenter']  = ['mouseover'];
+  tests['pointerleave']  = ['mouseout'];
+
+  for (var name in tests) {
+    if (isSupported(name)) events[name] = name;
+    else {
+      events[name] = null;
+      for (var count in tests[name]) {
+        var type = tests[name][count];
+        if (isSupported(type)) {
+          events[name] = type;
+          events[type] = name;
+          break;
+        }
       }
-      element.dispatchEvent(oEvent);
-    } else {
-      options.clientX = options.pointerX;
-      options.clientY = options.pointerY;
-      var evt = document.createEventObject();
-      oEvent = extend(evt, options);
-      element.fireEvent('on' + eventName, oEvent);
+    }
+  }
+  tests = isSupported = null;
+
+  function simulate(element, type) {
+    var model = /iPhone|iP[oa]d/.test(navigator.userAgent) ? 'Apple'
+              : /Android|Chrome|Phantom/.test(navigator.userAgent) ? 'Android'
+              : 'PC';
+    var options = extend(defaults, arguments[2] || {});
+    var event, eventType = null;
+    for (var name in eventTypes) if (eventTypes[name].test(type)) { eventType = name; break; }
+    if (eventType) {
+      if (document.createEvent) {
+        event = document.createEvent(eventType);
+        if (eventType == 'HTMLEvents') {
+          event.initEvent(type, options.bubbles, options.cancelable);
+        } else if (eventType == 'MouseEvents') {
+          event.initMouseEvent(
+            type,
+            options.bubbles,
+            options.cancelable,
+            options.view,
+            options.button,
+            options.screenX,
+            options.screenY,
+            options.clientX,
+            options.clientY,
+            options.ctrlKey,
+            options.altKey,
+            options.shiftKey,
+            options.metaKey,
+            options.button,
+            element
+          );
+        } else if (eventType == 'TouchEvent') {
+          if (model === 'Android') {
+            event.initTouchEvent(
+              options.touchItem,
+              options.touchItem,
+              options.touchItem,
+              type,
+              options.view,
+              options.screenX,
+              options.screenY,
+              options.clientX,
+              options.clientY,
+              options.ctrlKey,
+              options.altKey,
+              options.shiftKey,
+              options.metaKey
+            );
+          } else if (model === 'Apple') {
+            event.initTouchEvent(
+              type,
+              options.bubbles,
+              options.cancelable,
+              options.view,
+              options.detail,
+              options.screenX,
+              options.screenY,
+              options.clientX,
+              options.clientY,
+              options.ctrlKey,
+              options.altKey,
+              options.shiftKey,
+              options.metaKey,
+              options.touches,
+              options.targetTouches,
+              options.changedTouches,
+              options.scale,
+              options.rotation
+            );
+          }
+        }
+        element.dispatchEvent(event);
+      } else {
+        options.clientX = options.pointerX;
+        options.clientY = options.pointerY;
+        var event = document.createEventObject();
+        extend(event, options);
+        element.fireEvent('on' + type, event);
+      }
     }
     return element;
   }
@@ -34,22 +125,43 @@ describe('Responders Module', function () {
     return destination;
   }
 
-  var eventMatchers = {
-    'HTMLEvents': /^(?:load|unload|abort|error|select|change|submit|reset|focus|blur|resize|scroll)$/,
-    'MouseEvents': /^((mouse|pointer|touch)(start|end|down|up|over|move|out))$/
+  var eventTypes = {
+    'HTMLEvents': /^(load|unload|abort|error|select|change|submit|reset|focus|blur|resize|scroll)$/,
+    'MouseEvents': /^mouse(down|up|move|over|out|enter|leave)$/,
+    'TouchEvent': /^touch(start|end|move|cancel)$/
   }
 
-  var defaultOptions = {
-    pointerX: 0,
-    pointerY: 0,
+  var defaults = {
+    view: document.defaultView || window,
+    clientX: 0,
+    clientY: 0,
+    screenX: 0,
+    screenY: 0,
+
     button: 0,
+    which: 0,
+    detail: 0,
     ctrlKey: false,
     altKey: false,
     shiftKey: false,
     metaKey: false,
+
     bubbles: true,
-    cancelable: true
-  }
+    cancelable: true,
+
+    scale: 1,
+    rotation: 0,
+
+    touchItem: 0,
+    touches: 0,
+    targetTouches: 0,
+    changedTouches: 0
+  };
+
+
+
+
+  var Responders = Skin.Responders;
 
 
 
@@ -154,61 +266,59 @@ describe('Responders Module', function () {
 
 
     it('loads asynchronously', function(done) {
-      check = false;
-      component.on(element, 'pointerdown', function(event) { check = true; });
+      component.on(element, 'pointerdown', function() {});
 
       component.once('respond.pointer', function() {
-        simulate(element, 'mousedown');
-        simulate(element, 'touchstart');
-        simulate(element, 'pointerdown');
-        component.off(element);
-        expect(check).to.be.true;
         done();
       });
     });
 
 
-    it('responds to pointerdown and returns pointer parameters', function(done) {
+    it('maps pointerdown to ' + events.pointerdown + ', and returns event parameters', function(done) {
       component.once(element, 'pointerdown.namespaced', function(event) {
         expect(event).to.exist;
         done();
       });
 
       component.once('respond.pointer', function() {
-        simulate(element, 'mousedown');
-        simulate(element, 'touchstart');
-        simulate(element, 'pointerdown');
+        simulate(element, events.pointerdown);
       });
     });
 
 
-    it('responds to pointerup and returns pointer parameters', function(done) {
+    it('maps pointerup to ' + events.pointerup + ', and returns event parameters', function(done) {
       component.once(document.body, 'pointerup', function(event) {
         expect(event).to.exist;
         done();
       });
 
       component.once('respond.pointer', function() {
-        simulate(document.body, 'mouseup');
-        simulate(document.body, 'touchend');
-        simulate(document.body, 'pointerup');
+        simulate(document.body, events.pointerup);
       });
     });
 
 
-    it('responds to pointermove and returns pointer parameters', function(done) {
+    it('maps pointermove to ' + events.pointermove + ', and returns event parameters', function(done) {
       component.once(element, 'pointermove', function(event) {
         expect(event).to.exist;
         done();
       });
 
       component.once('respond.pointer', function() {
-        simulate(element, 'mousemove');
-        simulate(element, 'touchmove');
-        simulate(element, 'pointermove');
+        simulate(element, events.pointermove);
       });
     });
 
+
+    if (events.pointercancel) {
+      it('maps pointercancel to ' + events.pointercancel, function(done) {
+        component.once(element, 'pointercancel', function() { done(); });
+
+        component.once('respond.pointer', function() {
+          simulate(element, events.pointercancel);
+        });
+      });
+    }
 
   });
 
