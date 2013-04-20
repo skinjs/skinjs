@@ -107,12 +107,11 @@
   // returns the index of item
   Tools.indexFor = function(array, item, insert) {
     var empty = array.length;
-    if (Tools.isUndefined(insert)) insert = true;
     for (var index = 0; index < array.length; index++) {
       if (array[index] === item) return index;
       if (array[index] === undefined) empty = index;
     }
-    if (insert) {
+    if (insert || Tools.isUndefined(insert)) {
       array[empty] = item;
       return empty;
     } else return -1;
