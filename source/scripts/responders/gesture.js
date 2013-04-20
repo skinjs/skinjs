@@ -57,11 +57,11 @@ define('responders/gesture', ['skin'], function(Skin) {
 
   function add(element, name, context) {
     var index = Tools.indexFor(indices, element)
-      , path  = hub[index] || (hub[index] = {});
-    if (path[name]) {
-      path[name].push(context);
+      , handlers = hub[index] || (hub[index] = {});
+    if (handlers[name]) {
+      handlers[name].push(context);
     } else {
-      path[name] = [context];
+      handlers[name] = [context];
       context.on(element, 'pointerdown', start);
       context.on(element, 'pointerup', end);
       context.on(element, 'pointercancel', cancel);
@@ -76,10 +76,10 @@ define('responders/gesture', ['skin'], function(Skin) {
   function remove(element, name, context) {
 //    if (!name.length) { clear(element, context); return; }
     var index = Tools.indexFor(indices, element)
-      , path  = hub[index][name];
-    if (path[name]) {
-      Tools.remove(path[name], context);
-      if (!path[name].length) {
+      , handlers = hub[index][name];
+    if (handlers[name]) {
+      Tools.remove(handlers[name], context);
+      if (!handlers[name].length) {
         context.off(element, 'pointerdown', start);
         context.off(element, 'pointerup', end);
         context.off(element, 'pointercancel', cancel);
@@ -88,10 +88,10 @@ define('responders/gesture', ['skin'], function(Skin) {
         else if (name == 'dragover') context.off(element, 'pointerenter', over);
         else if (name == 'dragout') context.off(element, 'pointerenter', out);
         else if (!/press$/.test(name)) context.off(element, 'pointermove', move);
-        delete path[name];
+        delete handlers[name];
         // check if any other handlers available for the element
         // if not, remove the element from indices
-        if (Tools.isEmpty(path)) {
+        if (Tools.isEmpty(handlers)) {
           delete hub[index];
           delete indices[index];
         }
@@ -103,7 +103,7 @@ define('responders/gesture', ['skin'], function(Skin) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
       , index    = Tools.indexFor(indices, source)
-      , path     = hub[index]
+      , handlers = hub[index]
       , now      = Date.now()
       , delay;
 
@@ -113,20 +113,20 @@ define('responders/gesture', ['skin'], function(Skin) {
     // single touch and mouse events, press, drag, swipe
     if (pointers.length === 1) {
 
-      if (path[DOUBLE_PRESS]) {
+      if (handlers[DOUBLE_PRESS]) {
         if (!gesture.presses) gesture.presses = 1;
         else gesture.presses++;
       }
 
-      if (path[CONTROL_PRESS]) {
-        if (isControlPress(event)) trigger(path[CONTROL_PRESS], source, CONTROL_PRESS, event);
+      if (handlers[CONTROL_PRESS]) {
+        if (isControlPress(event)) trigger(handlers[CONTROL_PRESS], source, CONTROL_PRESS, event);
       }
 
-      if (path[LONG_PRESS]) {
+      if (handlers[LONG_PRESS]) {
         if (!isControlPress(event)) {
           if (timeout) w.clearTimeout(timeout);
           timeout = w.setTimeout(function() {
-            trigger(path[LONG_PRESS], source, LONG_PRESS, event);
+            trigger(handlers[LONG_PRESS], source, LONG_PRESS, event);
             timeout = null;
           }, downTimeout);
         }
@@ -138,7 +138,7 @@ define('responders/gesture', ['skin'], function(Skin) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
       , index    = Tools.indexFor(indices, source)
-      , path     = hub[index]
+      , handlers = hub[index]
       , now      = Date.now()
       , delay;
 
@@ -147,15 +147,15 @@ define('responders/gesture', ['skin'], function(Skin) {
       // single touch and mouse events, press, drag, swipe
       if (pointers.length === 1) {
 
-        if (path[PRESS]) trigger(path[PRESS], source, PRESS, event);
+        if (handlers[PRESS]) trigger(handlers[PRESS], source, PRESS, event);
 
-        if (path[DOUBLE_PRESS]) {
+        if (handlers[DOUBLE_PRESS]) {
           if (gesture.presses === 2 && now - gesture.time < upTimeout) {
-            trigger(path[DOUBLE_PRESS], source, DOUBLE_PRESS, event);
+            trigger(handlers[DOUBLE_PRESS], source, DOUBLE_PRESS, event);
           }
         }
 
-        if (path[LONG_PRESS] && timeout) {
+        if (handlers[LONG_PRESS] && timeout) {
           w.clearTimeout(timeout);
           timeout = null;
         }
@@ -164,11 +164,9 @@ define('responders/gesture', ['skin'], function(Skin) {
   }
 
   function enter(event) {
-    
   }
 
   function leave(event) {
-    
   }
 
   function over(event) {
@@ -189,7 +187,7 @@ define('responders/gesture', ['skin'], function(Skin) {
     Tools.each(contexts, function(context) { context.trigger(source, name, event); });
   }
 
-  // define control press, right-click, control-click
+  // define control press, right click, control click
   function isControlPress(event) {
     return event.ctrlKey ? true
          : event.which ? event.which == 3
