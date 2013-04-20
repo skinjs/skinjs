@@ -105,14 +105,17 @@
   // helper for indexing elements
   // adds item, if not exists, at the first empty index
   // returns the index of item
-  Tools.indexFor = function(array, item) {
+  Tools.indexFor = function(array, item, insert) {
     var empty = array.length;
+    if (Tools.isUndefined(insert)) insert = true;
     for (var index = 0; index < array.length; index++) {
       if (array[index] === item) return index;
       if (array[index] === undefined) empty = index;
     }
-    array[empty] = item;
-    return empty;
+    if (insert) {
+      array[empty] = item;
+      return empty;
+    } else return -1;
   };
 
 

@@ -81,11 +81,12 @@ define('responders/pointer', ['skin'], function(Skin) {
   function add(element, name, context) {
     var type = events[name];
     if (type) {
-      var path = Tools.indexFor(indices, element) + '.' + name;
-      if (hub[path]) {
-        hub[path].push(context);
+      var index = Tools.indexFor(indices, element)
+        , handlers = hub[index] || (hub[index] = {});
+      if (handlers[name]) {
+        handlers[name].push(context);
       } else {
-        hub[path] = [context];
+        handlers[name] = [context];
         element.addEventListener(type, handle, false);
       }
     }
@@ -96,18 +97,19 @@ define('responders/pointer', ['skin'], function(Skin) {
     if (!name.length) { clear(element, context); return; }
     var type = events[name];
     if (type) {
-      var index = Tools.indexFor(indices, element)
-        , path  = index + '.' + name;
-      if (hub[path]) {
-        Tools.remove(hub[path], context);
-        if (!hub[path].length) {
+      var index = Tools.indexFor(indices, element, false)
+        , handlers = hub[index];
+      if (handlers && handlers[name]) {
+        Tools.remove(handlers[name], context);
+        if (!handlers[name].length) {
           element.removeEventListener(type, handle);
-          delete hub[path];
+          delete handlers[name];
           // check if any other handlers available for the element
           // if not, remove the element from indices
-          var keys = Tools.keys(hub), exist;
-          Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
-          if (!exist) delete indices[index];
+          if (Tools.isEmpty(handlers)) {
+            delete hub[index];
+            delete indices[index];
+          }
         }
       }
     }
@@ -116,18 +118,20 @@ define('responders/pointer', ['skin'], function(Skin) {
   // clear off element, all handlers for the specified context should be removed
   // this is when something like context.off(element) was called
   function clear(element, context) {
-    Tools.each(hub, function(contexts, path) {
+    var index = Tools.indexFor(indices, element, false)
+      , handlers = hub[index];
+
+    if (handlers) Tools.each(handlers, function(contexts, name) {
       Tools.reject(contexts, function(which) { return which === context; });
       if (!contexts.length) {
-        var type  = events[path.split('.')[1]]
-          , index = path.split('.')[0];
-        element.removeEventListener(type, handle);
-        delete hub[path];
+        element.removeEventListener(events[name], handle);
+        delete handlers[name];
         // check if any other handlers available for the element
         // if not, remove the element from indices
-        var keys = Tools.keys(hub), exist;
-        Tools.each(keys, function(key) { if (key.indexOf(index) === 0) { exist = true; return false; }});
-        if (!exist) delete indices[parseInt(index, 10)];
+        if (Tools.isEmpty(handlers)) {
+          delete hub[index];
+          delete indices[index];
+        }
       }
     });
   }
@@ -138,22 +142,23 @@ define('responders/pointer', ['skin'], function(Skin) {
       , source     = event.target
       , related    = event.relatedTarget
       , name       = events[event.type]
-      , index      = Tools.indexFor(indices, target) + '.';
+      , index      = Tools.indexFor(indices, target, false)
+      , handlers   = hub[index][name];
 
     // simulate pointerenter and pointerleave using pointerover and pointerout
     if ((name == POINTER_OVER && events[POINTER_OVER] == events[POINTER_ENTER]) && (!related || (related !== target && !contains(target, related))))
-      trigger(hub[index + POINTER_ENTER], source, POINTER_ENTER, event);
+      trigger(handlers, source, POINTER_ENTER, event);
     if ((name == POINTER_OUT && events[POINTER_OUT] == events[POINTER_LEAVE]) && (!related || (related !== target && !contains(target, related))))
-      trigger(hub[index + POINTER_LEAVE], source, POINTER_LEAVE, event);
+      trigger(handlers, source, POINTER_LEAVE, event);
 
     if (source === target) {
-      trigger(hub[index + name], source, name, event);
+      trigger(handlers, source, name, event);
     }
   }
 
   // trigger all listening contexts
-  function trigger(contexts, source, name, event) {
-    Tools.each(contexts, function(context) { context.trigger(source, name, event); });
+  function trigger(handlers, source, name, event) {
+    Tools.each(handlers, function(context) { context.trigger(source, name, event); });
   }
 
 

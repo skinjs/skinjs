@@ -75,9 +75,9 @@ define('responders/gesture', ['skin'], function(Skin) {
 
   function remove(element, name, context) {
 //    if (!name.length) { clear(element, context); return; }
-    var index = Tools.indexFor(indices, element)
-      , handlers = hub[index][name];
-    if (handlers[name]) {
+    var index = Tools.indexFor(indices, element, false)
+      , handlers = hub[index];
+    if (handlers && handlers[name]) {
       Tools.remove(handlers[name], context);
       if (!handlers[name].length) {
         context.off(element, 'pointerdown', start);
@@ -102,10 +102,12 @@ define('responders/gesture', ['skin'], function(Skin) {
   function start(event) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source)
+      , index    = Tools.indexFor(indices, source, false)
       , handlers = hub[index]
       , now      = Date.now()
       , delay;
+
+    if (!handlers) return;
 
     // start new gesture, if there's a new source or a big time gap
     if (source !== gesture.source || now - gesture.time > upTimeout) gesture = { source: source, time: now };
@@ -137,10 +139,12 @@ define('responders/gesture', ['skin'], function(Skin) {
   function end(event) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source)
+      , index    = Tools.indexFor(indices, source, false)
       , handlers = hub[index]
       , now      = Date.now()
       , delay;
+
+    if (!handlers) return;
 
     if (source === gesture.source) {
 
@@ -183,8 +187,8 @@ define('responders/gesture', ['skin'], function(Skin) {
   }
 
   // trigger all listening contexts
-  function trigger(contexts, source, name, event) {
-    Tools.each(contexts, function(context) { context.trigger(source, name, event); });
+  function trigger(handlers, source, name, event) {
+    Tools.each(handlers, function(context) { context.trigger(source, name, event); });
   }
 
   // define control press, right click, control click

@@ -13,6 +13,7 @@ define('responders/window', ['skin'], function(Skin) {
   var w = window, d = document, e = d.documentElement, b = d.body, Tools = Skin.Tools, hub = {}, width, height, x, y;
 
   function add(emitter, name, context) {
+    // indices is not needed, because all events are window's
     // existing handler
     if (hub[name]) {
       hub[name].contexts.push(context);
@@ -26,7 +27,7 @@ define('responders/window', ['skin'], function(Skin) {
     w['on' + name] = function(event) {
       handle(name);
       // calling the old handler
-      if (Tools.isFunction(hub[name].handler)) hub[name].old();
+      if (Tools.isFunction(hub[name].old)) hub[name].old();
     };
   }
 
