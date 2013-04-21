@@ -25,97 +25,96 @@
   // such as jQuery, Underscore, Zepto etc. via AMD
   Tools = {};
 
-  Tools.arrays      = Array.prototype;
-  Tools.objects     = Object.prototype;
-  Tools.arraySlice  = Tools.arrays.slice;
-  Tools.objectHas   = Tools.objects.hasOwnProperty;
+  var Arrays      = Tools.Arrays      = Array.prototype
+    , Objects     = Tools.Objects     = Object.prototype
+    , arraySlice  = Tools.arraySlice  = Arrays.slice
+    , objectHas   = Tools.objectHas   = Objects.hasOwnProperty
 
-  Tools.isArray     = function(symbol) { return !!symbol && (symbol.isArray || symbol instanceof Array); };
-  Tools.isObject    = function(symbol) { return !!symbol && typeof(symbol) === 'object' && !Tools.isArray(symbol); };
-  Tools.isElement   = function(symbol) { return !!symbol && (symbol.nodeType == 1 || symbol.nodeType == 9); };
-  Tools.isString    = function(symbol) { return typeof(symbol) === 'string'; };
-  Tools.isFunction  = function(symbol) { return typeof(symbol) === 'function'; };
-  Tools.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; };
-  Tools.isNumber    = function(symbol) { return typeof(symbol) === 'number'; };
-  Tools.isUndefined = function(symbol) { return symbol === undefined; };
+    , isArray     = Tools.isArray     = function(symbol) { return !!symbol && (symbol.isArray || symbol instanceof Array); }
+    , isObject    = Tools.isObject    = function(symbol) { return !!symbol && typeof(symbol) === 'object' && !isArray(symbol); }
+    , isElement   = Tools.isElement   = function(symbol) { return !!symbol && (symbol.nodeType == 1 || symbol.nodeType == 9); }
+    , isString    = Tools.isString    = function(symbol) { return typeof(symbol) === 'string'; }
+    , isFunction  = Tools.isFunction  = function(symbol) { return typeof(symbol) === 'function'; }
+    , isBoolean   = Tools.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; }
+    , isNumber    = Tools.isNumber    = function(symbol) { return typeof(symbol) === 'number'; }
+    , isUndefined = Tools.isUndefined = function(symbol) { return symbol === undefined; }
 
-  // iterator, breaks if any iteration returns false
-  Tools.each = function(symbol, iterator, context) {
-    if (Tools.isArray(symbol)) for (var index = 0; index < symbol.length; index++) {
-      if (iterator.call(context, symbol[index], index, symbol) === false) return;
-    } else if (Tools.isObject(symbol)) for (var key in symbol) {
-      if (Tools.objectHas.call(symbol, key)) {
-        if (iterator.call(context, symbol[key], key, symbol) === false) return;
+    // iterator, breaks if any iteration returns false
+    , each = Tools.each = function(symbol, iterator, context) {
+        if (isArray(symbol)) for (var index = 0; index < symbol.length; index++) {
+          if (iterator.call(context, symbol[index], index, symbol) === false) return;
+        } else if (isObject(symbol)) for (var key in symbol) {
+          if (objectHas.call(symbol, key)) {
+            if (iterator.call(context, symbol[key], key, symbol) === false) return;
+          }
+        }
       }
-    }
-  };
 
-  // basic filter function
-  // this can be overridden by a sophisticated version later, via AMD
-  Tools.filter = function(array, iterator, context) {
-    for (var index = array.length - 1; index >= 0; index--) {
-      if (!iterator.call(context || this, array[index], index, array)) array.splice(index, 1);
-    }
-  };
-
-  // basic reject function
-  // this can be overridden by a sophisticated version later, via AMD
-  Tools.reject = function(array, iterator, context) {
-    for (var index = array.length - 1; index >= 0; index--) {
-      if (iterator.call(context || this, array[index], index, array)) array.splice(index, 1);
-    }
-  };
-
-  // check if array, string or object is empty
-  Tools.isEmpty = function(target) {
-    if (target === null) return true;
-    if (Tools.isArray(target) || Tools.isString(target)) return target.length === 0;
-    for (var key in target) if (Tools.objectHas(target, key)) return false;
-    return true;
-  };
-
-  // recursive extend, also removes a property from target if it is explicitly set to undefined in source
-  Tools.extend = function(target) {
-    Tools.each(Tools.arraySlice.call(arguments, 1), function(source) {
-      for (var key in source) {
-        if (Tools.isUndefined(source[key]) && target[key]) delete target[key];
-        else if (Tools.isObject(source[key]) && Tools.isObject(target[key])) Tools.extend(target[key], source[key]);
-        else target[key] = source[key];
+    // basic filter function
+    // this can be overridden by a sophisticated version later, via AMD
+    , filter = Tools.filter = function(array, iterator, context) {
+        for (var index = array.length - 1; index >= 0; index--) {
+          if (!iterator.call(context || this, array[index], index, array)) array.splice(index, 1);
+        }
       }
-    });
-    return target;
-  };
 
-  // make it easier to support IE8 in future
-  Tools.inArray = function(array, item, index) { return Tools.arrays.indexOf.call(array, item, index); };
+    // basic reject function
+    // this can be overridden by a sophisticated version later, via AMD
+    , reject = Tools.reject = function(array, iterator, context) {
+        for (var index = array.length - 1; index >= 0; index--) {
+          if (iterator.call(context || this, array[index], index, array)) array.splice(index, 1);
+        }
+      }
 
-  // basic remove function, removes an item from array
-  // this can be overridden by a sophisticated version later, via AMD
-  Tools.remove = function(array, item) {
-    array.splice(Tools.inArray(array, item), 1);
-  };
+    // check if array, string or object is empty
+    , isEmpty = Tools.isEmpty = function(target) {
+        if (isArray(target) || isString(target)) return target.length === 0;
+        if (isObject(target)) for (var key in target) if (objectHas.call(target, key)) return false;
+        return !target;
+      }
 
-  // get array of keys in an object
-  Tools.keys = Object.keys || function(object) {
-    var keys = [];
-    for (var key in object) if (Tools.objectHas.call(object, key)) keys.push(key);
-    return keys;
-  };
+    // recursive extend, also removes a property from target if it is explicitly set to undefined in source
+    , extend = Tools.extend = function(target) {
+        each(arraySlice.call(arguments, 1), function(source) {
+          for (var key in source) {
+            if (isUndefined(source[key]) && target[key]) delete target[key];
+            else if (isObject(source[key]) && isObject(target[key])) extend(target[key], source[key]);
+            else target[key] = source[key];
+          }
+        });
+        return target;
+      }
 
-  // helper for indexing elements
-  // adds item, if not exists, at the first empty index
-  // returns the index of item
-  Tools.indexFor = function(array, item, insert) {
-    var empty = array.length;
-    for (var index = 0; index < array.length; index++) {
-      if (array[index] === item) return index;
-      if (array[index] === undefined) empty = index;
-    }
-    if (insert || Tools.isUndefined(insert)) {
-      array[empty] = item;
-      return empty;
-    } else return -1;
-  };
+    // make it easier to support IE8 in future
+    , inArray = Tools.inArray = function(array, item, index) { return Arrays.indexOf.call(array, item, index); }
+
+    // basic remove function, removes an item from array
+    // this can be overridden by a sophisticated version later, via AMD
+    , remove = Tools.remove = function(array, item) {
+        array.splice(inArray(array, item), 1);
+      }
+
+    // get array of keys in an object
+    , keys = Tools.keys = Object.keys || function(object) {
+        var keys = [];
+        for (var key in object) if (objectHas.call(object, key)) keys.push(key);
+        return keys;
+      }
+
+    // helper for indexing elements
+    // adds item, if not exists, at the first empty index
+    // returns the index of item
+    , indexFor = Tools.indexFor = function(array, item, insert) {
+        var empty = array.length;
+        for (var index = 0; index < array.length; index++) {
+          if (array[index] === item) return index;
+          if (array[index] === undefined) empty = index;
+        }
+        if (insert || isUndefined(insert)) {
+          array[empty] = item;
+          return empty;
+        } else return -1;
+      };
 
 
 
@@ -128,8 +127,8 @@
   Behaviors = {};
 
   // API for adding or removing behaviors for components
-  //function behave(prototype, name, flag) {
-  //}
+  function behave(prototype, name, flag) {
+  }
 
 
 
@@ -142,12 +141,12 @@
   Responders = {};
 
   // register default responders
-  Tools.each({
+  each({
     Window:   function(emitter, name, context) { return emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name); },
     Document: function(emitter, name, context) { return emitter === document && /^(contextmenu|ready)$/.test(name); },
-    Keyboard: function(emitter, name, context) { return Tools.isElement(emitter) && /^key(press|up|down)/.test(name); },
-    Pointer:  function(emitter, name, context) { return Tools.isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name); },
-    Gesture:  function(emitter, name, context) { return Tools.isElement(emitter) && /^((double|long|control){0,1}press|drop|drag(start|end|enter|leave|over|out){0,1}|(swipe|rotate|pinch)(start|end){0,1})$/.test(name); }
+    Keyboard: function(emitter, name, context) { return isElement(emitter) && /^key(press|up|down)/.test(name); },
+    Pointer:  function(emitter, name, context) { return isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name); },
+    Gesture:  function(emitter, name, context) { return isElement(emitter) && /^((double|long|control){0,1}press|drop|drag(start|end|enter|leave|over|out){0,1}|(swipe|rotate|pinch)(start|end){0,1})$/.test(name); }
   }, function(check, name) {
     Responders[name] = { path: 'responders/' + name.toLowerCase(), check: check };
   });
@@ -156,12 +155,12 @@
   function respond(emitter, name, context, flag) {
     if (!name.length && !flag) {
       // special case, remove form all available responders
-      Tools.each(Responders, function(Responder) { if (Responder.remove) Responder.remove(emitter, name, context); });
+      each(Responders, function(Responder) { if (Responder.remove) Responder.remove(emitter, name, context); });
       return;
     }
     // trim namespaced event name
     name = name.split('.')[0];
-    Tools.each(Responders, function(Responder, responderName) {
+    each(Responders, function(Responder, responderName) {
       if (Responder.check(emitter, name, context)) {
         // matching responder
         Skin.require(Skin.pack, [Responder.path], function() {
@@ -187,7 +186,7 @@
   // from component prototypes like other behaviors
   Events = (function() {
 
-    // publisher indices, shared handlers hub, cache for fast triggering, reference to Tools helpers
+    // publisher indices, shared handlers hub, cache for fast triggering
     var name = 'Eventable', indices = [], hub = {}, cache = {};
 
     // figure out emitter, path and callback
@@ -196,12 +195,12 @@
     function sanitize(args) {
       var emitter = this, index = 0, name = '', path, callback = args[args.length - 1];
       // last argument can be the callback
-      if (Tools.isFunction(callback)) args = args.slice(0, -1);
+      if (isFunction(callback)) args = args.slice(0, -1);
       else callback = null;
       // first argument can be the emitter
-      if (!Tools.isString(args[0])) { emitter = args[0]; args = args.slice(1); }
-      if (Tools.isString(args[0])) { name = args[0]; }
-      index = Tools.indexFor(indices, emitter) + '';
+      if (!isString(args[0])) { emitter = args[0]; args = args.slice(1); }
+      if (isString(args[0])) { name = args[0]; }
+      index = indexFor(indices, emitter) + '';
       path = index + (name.length ? '.' + name : '');
       return {
         emitter: emitter,
@@ -214,16 +213,16 @@
 
     function on() {
       var context = this
-        , args    = sanitize.call(context, Tools.arraySlice.call(arguments, 0))
+        , args    = sanitize.call(context, arraySlice.call(arguments, 0))
         , duplicate
         , name;
       // make sure the same handler is not added again
-      Tools.each(hub[args.path], function(handler) {
+      each(hub[args.path], function(handler) {
         // if duplicate found, return false to break the each iterator
         if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
       });
       if (duplicate) return context;
-      if (!Tools.objectHas.call(hub, args.path)) hub[args.path] = [];
+      if (!objectHas.call(hub, args.path)) hub[args.path] = [];
       hub[args.path].push({ callback: args.callback, context: context });
       // create responders for external events
       respond(args.emitter, args.name, context, true);
@@ -234,10 +233,10 @@
 
     function once() {
       var context = this
-        , args    = sanitize.call(context, Tools.arraySlice.call(arguments, 0))
+        , args    = sanitize.call(context, arraySlice.call(arguments, 0))
         , duplicate;
       // make sure the same handler is not added again
-      Tools.each(hub[args.path], function(handler) {
+      each(hub[args.path], function(handler) {
         // if duplicate found, return false to break the each iterator
         if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
       });
@@ -252,25 +251,25 @@
 
     function off() {
       var context = this
-        , args    = sanitize.call(context, Tools.arraySlice.call(arguments, 0))
-        , keys    = Tools.keys(hub)
+        , args    = sanitize.call(context, arraySlice.call(arguments, 0))
+        , hubKeys = keys(hub)
         , exist
         , name;
       // remember, at this point an index is created for the emitter
       // even if it doesn't have any listeners, but at the end we remove empty indices
       // find all handlers keys starting with path, namespaced keys
-      Tools.filter(keys, function(key) { return key === args.path || key.indexOf(args.path + '.') === 0; });
+      filter(hubKeys, function(key) { return key === args.path || key.indexOf(args.path + '.') === 0; });
       // find all callbacks to be removed
-      Tools.each(keys, function(key) {
-        Tools.reject(hub[key], function(handler) { return args.callback ? handler.callback === args.callback : handler.context === context; });
+      each(hubKeys, function(key) {
+        reject(hub[key], function(handler) { return args.callback ? handler.callback === args.callback : handler.context === context; });
         if (!hub[key].length) delete hub[key];
       });
       // check if cache should be cleared
       if (args.emitter === cache.emitter) cache = {};
       // check if any other handlers available for the emitter
       // if not, remove the emitter from indices
-      keys = Tools.keys(hub);
-      Tools.each(keys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
+      hubKeys = keys(hub);
+      each(hubKeys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
       if (!exist) delete indices[parseInt(args.index, 10)];
       // remove responders for external events
       respond(args.emitter, args.name, context, false);
@@ -278,30 +277,30 @@
     }
 
     function trigger(emitter, name, parameters) {
-      var context = this, handlers, path, keys;
-      if (Tools.isString(emitter)) { parameters = name; name = emitter; emitter = context; }
+      var context = this, handlers, path, hubKeys;
+      if (isString(emitter)) { parameters = name; name = emitter; emitter = context; }
       // if its a cached trigger call, no need to find handlers
       if (cache.emitter === emitter && cache.name === name) handlers = cache.handlers;
       else {
-        if (Tools.inArray(indices, emitter) === -1) return context;
+        if (inArray(indices, emitter) === -1) return context;
         handlers = [];
-        path = Tools.indexFor(indices, emitter) + (Tools.isString(name) ? '.' + name : '');
+        path = indexFor(indices, emitter) + (isString(name) ? '.' + name : '');
         // add handlers for path
-        if (Tools.objectHas.call(hub, path)) handlers = handlers.concat(hub[path]);
+        if (objectHas.call(hub, path)) handlers = handlers.concat(hub[path]);
         // find handlers in namespaced paths
         path = path + '.';
-        keys = Tools.keys(hub);
-        Tools.filter(keys, function(key) {
+        hubKeys = keys(hub);
+        filter(hubKeys, function(key) {
           return key.indexOf(path) === 0;
         });
-        Tools.each(keys, function(key) {
+        each(hubKeys, function(key) {
           handlers = handlers.concat(hub[key]);
         });
         cache.emitter = emitter;
         cache.name = name;
         cache.handlers = handlers;
       }
-      Tools.each(handlers, function(handler) { handler.callback.call(handler.context, parameters); });
+      each(handlers, function(handler) { handler.callback.call(handler.context, parameters); });
       return context;
     }
 
@@ -313,7 +312,7 @@
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
         if (constructor.check(name)) return prototype;
-        Tools.extend(prototype, { on: on, once: once, off: off, trigger: trigger });
+        extend(prototype, { on: on, once: once, off: off, trigger: trigger });
         behaviors.push(name);
         return prototype;
       },
@@ -324,8 +323,8 @@
           , behaviors   = constructor.behaviors;
         if (!constructor.check(name)) return prototype;
         prototype.off();
-        Tools.extend(prototype, { on: undefined, once: undefined, off: undefined, trigger: undefined });
-        Tools.remove(behaviors, name);
+        extend(prototype, { on: undefined, once: undefined, off: undefined, trigger: undefined });
+        remove(behaviors, name);
         return prototype;
       }
 
@@ -351,15 +350,15 @@
   //          Skin(element, name, { options... })
   //          Skin(element, name).action()
   Skin = function() {
-    var args = Tools.arraySlice.call(arguments, 0), element, name, settings;
+    var args = arraySlice.call(arguments, 0), element, name, settings;
     // find out what are the arguments
-    if (Tools.isElement(args[0])) { element  = args[0]; args = args.slice(1); }
-    if (Tools.isString(args[0]))  { name     = args[0]; args = args.slice(1); }
-    if (Tools.isObject(args[0]))  { settings = args[0]; }
+    if (isElement(args[0])) { element  = args[0]; args = args.slice(1); }
+    if (isString(args[0]))  { name     = args[0]; args = args.slice(1); }
+    if (isObject(args[0]))  { settings = args[0]; }
     // check if only settings object is available, configure Skin itself
     // this way we can configure require, preload and pack before initialize or loading any other module
     if (settings && !element && !name) {
-      Tools.extend(Skin, settings);
+      extend(Skin, settings);
       return Skin;
     } else {
       var component  = function() {}
@@ -368,8 +367,8 @@
       component.behaviors = [];
       // method to add behaviors to the constructor
       component.is = function() {
-        var args = arguments, behaviors = Tools.isArray(args[0])? args[0] : Tools.arraySlice.call(args, 0);
-        Tools.each(behaviors, function(behavior) {
+        var args = arguments, behaviors = isArray(args[0])? args[0] : arraySlice.call(args, 0);
+        each(behaviors, function(behavior) {
           if (Skin.Behaviors[behavior]) {
             Skin.Behaviors[behavior].add.call(components);
             Skin.trigger(component, 'behavior', { type: 'add', name: behavior });
@@ -384,7 +383,7 @@
       // method to remove behaviors from the constructor
       component.isnt = function() {};
       // check if constructor has a behavior
-      component.check = function(behavior) { return Tools.inArray(component.behaviors, behavior) != -1; };
+      component.check = function(behavior) { return inArray(component.behaviors, behavior) != -1; };
       // return the product
       return component;
     }
@@ -439,5 +438,5 @@
 
   // export, attach Skin to context
   context.Skin = Skin;
-  if (Tools.isFunction(define) && define.amd) define('skin', function() { return Skin; });
+  if (isFunction(define) && define.amd) define('skin', function() { return Skin; });
 }).call(this);

@@ -8,8 +8,8 @@ describe('Tools Module', function () {
 
   describe('Shortcuts', function() {
     it('has basic types', function() {
-      expect(Tools.objects).to.equal(Object.prototype);
-      expect(Tools.arrays).to.equal(Array.prototype);
+      expect(Tools.Objects).to.equal(Object.prototype);
+      expect(Tools.Arrays).to.equal(Array.prototype);
       expect(Tools.arraySlice).to.equal(Array.prototype.slice);
       expect(Tools.objectHas).to.equal(Object.prototype.hasOwnProperty);
     })
