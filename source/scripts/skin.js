@@ -137,7 +137,6 @@
   // =================
   // hooks for adding and removing external event listeners
   // such as window, mouse, document or keyboard events
-  // TODO: other libraries, like Backbone
   Responders = {};
 
   // register default responders
@@ -211,6 +210,9 @@
       };
     }
 
+    // example: context.on(emitter, name, callback)
+    //          context.on(selector, name, callback)
+    //          context.on(name, callback)
     function on() {
       var context = this
         , args    = sanitize.call(context, arraySlice.call(arguments, 0))
@@ -231,6 +233,9 @@
       return context;
     }
 
+    // example: context.once(emitter, name, callback)
+    //          context.once(selector, name, callback)
+    //          context.once(name, callback)
     function once() {
       var context = this
         , args    = sanitize.call(context, arraySlice.call(arguments, 0))
@@ -249,6 +254,13 @@
       return context;
     }
 
+    // example: context.off(emitter, name, callback)
+    //          context.off(selector, name, callback)
+    //          context.off(name, callback)
+    //          context.off(name)
+    //          context.off(selector)
+    //          context.off(emitter)
+    //          context.off()
     function off() {
       var context = this
         , args    = sanitize.call(context, arraySlice.call(arguments, 0))
@@ -276,6 +288,9 @@
       return context;
     }
 
+    // example: context.trigger(emitter, name, parameters)
+    //          context.trigger(selector, name, parameters)
+    //          context.trigger(name, parameters)
     function trigger(emitter, name, parameters) {
       var context = this, handlers, path, hubKeys;
       if (isString(emitter)) { parameters = name; name = emitter; emitter = context; }
