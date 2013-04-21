@@ -11,7 +11,7 @@
   // Private Methods & Properties
   // ============================
   // existing Skin is kept as oldSkin, to be assigned back in noConflict()
-  var context = this, oldSkin = context.Skin, Tools, Events, Behaviors, Responders, Skin;
+  var context = this, oldSkin = context.Skin, Tools, Index, Events, Behaviors, Responders, Skin;
 
 
 
@@ -115,6 +115,67 @@
           return empty;
         } else return -1;
       };
+
+
+
+
+  // Index Module
+  // ============
+  // simple module for indexing uinique ids for everything
+  Index = (function() {
+    var namespaces = {}, indices = [], target, empty, index;
+
+    // get index, return -1 if doesn't exist
+    function get(item, namespace) {
+      target = namespace ? namespaces[namespace] : indices;
+      if (target) for (index = 0; index < target.length; index++) if (target[index] === item) return index;
+      return -1;
+    }
+
+    // set and get index, if exists returns the index,
+    // if not, inserts the item and then returns the index
+    function set(item, namespace) {
+      target = namespace ? namespaces[namespace] || (namespaces[namespace] = []) : indices;
+      empty = target.length;
+      for (index = 0; index < target.length; index++) {
+        if (target[index] === item) return index;
+        if (isUndefined(target[index])) empty = index;
+      }
+      target[empty] = item;
+      return empty;
+    }
+
+    // remove index
+    function remove(item, namespace) {
+      target = namespace ? namespaces[namespace] : indices;
+      if (target) {
+        var flag, result;
+        for (index = 0; index < target.length; index++) {
+          if (target[index] === item) {
+            delete target[index];
+            result = index;
+            if (flag) break;
+          }
+          if (!isUndefined(target[index])) {
+            flag = true;
+            if (!isUndefined(result)) break;
+          }
+        }
+        if (isUndefined(flag)) {
+          if (namespace) delete namespaces[namespace];
+          else indices = [];
+        }
+        return result;
+      }
+      return -1;
+    }
+
+    // remove everything
+    function reset() { namespaces = {}; indices = []; }
+
+    // public API
+    return { get: get, set: set, remove: remove, reset: reset };
+  })();
 
 
 
@@ -443,6 +504,7 @@
          Tools:      Tools,
          Behaviors:  Behaviors,
          Responders: Responders,
+         Index:      Index,
          on:         Events.on,
          once:       Events.once,
          off:        Events.off,
