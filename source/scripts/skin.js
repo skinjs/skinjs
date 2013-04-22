@@ -234,14 +234,14 @@
 
 
     // shared handlers hub, cache for fast triggering, temporary register for once calls
-    var behavior = 'Eventable', hub = {}, cache = {};
+    var namespace = 'events', behavior = 'Eventable', hub = {}, cache = {};
 
 
     // check if context handles (listens to) to an event from emitter
     function handles(emitter, name) {
       var context = this, index, prefix, result = false;
       if (isUndefined(name)) { name = emitter; emitter = context; }
-      index = Index.get(emitter, 'events');
+      index = Index.get(emitter, namespace);
       if (!hub[index]) return result;
       // look for exact name handlers
       each(hub[index][name], function(handler) { if (handler.context === context) { result = true; return false; }});
@@ -262,7 +262,7 @@
     function on(emitter, name, callback, temporary) {
       var context = this, index, handlers, handler, duplicate;
       if (isFunction(name)) { callback = name; name = emitter; emitter = context; }
-      index = Index.set(emitter, 'events');
+      index = Index.set(emitter, namespace);
       if (!hub[index]) hub[index] = {};
       handlers = hub[index][name] || (hub[index][name] = []);
       // make sure the same handler is not added again
@@ -318,28 +318,18 @@
         if (isString(emitter) && handles.call(context, emitter)) { name = emitter; emitter = context; }
         else { name = undefined; }
       }
-      index = Index.get(emitter, 'events');
+      index = Index.get(emitter, namespace);
       if (!hub[index]) return context;
       if (name) {
         // look for exact name handlers
-        handlers = hub[index][name];
-        if (handlers) {
-          reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
-          if (!handlers.length) delete hub[index][name];
-        }
+        if (hub[index][name]) remove(index, name, context, callback);
         // look for namespaced name handlers
         prefix = name + '.';
         each(hub[index], function(handlers, which) {
-          if (which.indexOf(prefix) === 0) {
-            reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
-            if (!handlers.length) delete hub[index][which];
-          }
+          if (which.indexOf(prefix) === 0) remove(index, which, context, callback);
         });
       } else {
-        each(hub[index], function(handlers, which) {
-          reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
-          if (!handlers.length) delete hub[index][which];
-        });
+        each(hub[index], function(handlers, which) { remove(index, which, context, callback); });
       }
       // check if cache should be cleared
       if (emitter === cache.emitter) cache = {};
@@ -347,11 +337,18 @@
       // if not, remove the emitter from indices
       if (isEmpty(hub[index])) {
         delete hub[index];
-        Index.remove(emitter, 'events');
+        Index.remove(emitter, namespace);
       }
       // remove responders for external events
       respond(emitter, name, context, false);
       return context;
+    }
+
+    // refactored helper for off(), internal use only
+    function remove(index, name, context, callback) {
+      var handlers = hub[index][name];
+      reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
+      if (!handlers.length) delete hub[index][name];
     }
 
 
@@ -364,7 +361,7 @@
       // if its a cached trigger call, no need to find handlers
       if (cache.emitter === emitter && cache.name === name) triggers = cache.triggers;
       else {
-        index = Index.get(emitter, 'events');
+        index = Index.get(emitter, namespace);
         if (!hub[index]) return context;
         triggers = [];
         // look for exact name handlers
