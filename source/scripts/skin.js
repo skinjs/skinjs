@@ -122,6 +122,7 @@
   // Index Module
   // ============
   // simple module for indexing uinique ids for everything
+  // globally or scoped by namespace
   Index = (function() {
     var namespaces = {}, indices = [], target, empty, index;
 
@@ -213,7 +214,7 @@
 
   // API for adding or removing responders for handling external events
   function respond(emitter, name, context, flag) {
-    if (!name.length && !flag) {
+    if (!name && !flag) {
       // special case, remove form all available responders
       each(Responders, function(Responder) { if (Responder.remove) Responder.remove(emitter, name, context); });
       return;
@@ -246,150 +247,168 @@
   // from component prototypes like other behaviors
   Events = (function() {
 
-    // publisher indices, shared handlers hub, cache for fast triggering
-    var name = 'Eventable', indices = [], hub = {}, cache = {};
 
-    // figure out emitter, path and callback
-    // for on(), once() and off() methods
-    // remember, indexFor() will push emitter in indices, if it doesn't exist
-    function sanitize(args) {
-      var emitter = this, index = 0, name = '', path, callback = args[args.length - 1];
-      // last argument can be the callback
-      if (isFunction(callback)) args = args.slice(0, -1);
-      else callback = null;
-      // first argument can be the emitter
-      if (!isString(args[0])) { emitter = args[0]; args = args.slice(1); }
-      if (isString(args[0])) { name = args[0]; }
-      index = indexFor(indices, emitter) + '';
-      path = index + (name.length ? '.' + name : '');
-      return {
-        emitter: emitter,
-        index: index,
-        name: name,
-        path: path,
-        callback: callback
-      };
+    // shared handlers hub, cache for fast triggering, temporary register for once calls
+    var behavior = 'Eventable', hub = {}, cache = {};
+
+
+    // check if context handles (listens to) to an event from emitter
+    function handles(emitter, name) {
+      var context = this, index, prefix, result = false;
+      if (isUndefined(name)) { name = emitter; emitter = context; }
+      index = Index.get(emitter, 'events');
+      if (!hub[index]) return result;
+      // look for exact name handlers
+      each(hub[index][name], function(handler) { if (handler.context === context) { result = true; return false; }});
+      if (result) return result;
+      // look for namespaced name handlers
+      prefix = name + '.';
+      each(hub[index], function(handlers, which) {
+        if (which.indexOf(prefix) === 0) each(handlers, function(handler) { if (handler.context === context) { result = true; return false; }});
+        if (result) return false;
+      });
+      return result;
     }
+
 
     // example: context.on(emitter, name, callback)
     //          context.on(selector, name, callback)
     //          context.on(name, callback)
-    function on() {
-      var context = this
-        , args    = sanitize.call(context, arraySlice.call(arguments, 0))
-        , duplicate
-        , name;
+    function on(emitter, name, callback, temporary) {
+      var context = this, index, handlers, handler, duplicate;
+      if (isFunction(name)) { callback = name; name = emitter; emitter = context; }
+      index = Index.set(emitter, 'events');
+      if (!hub[index]) hub[index] = {};
+      handlers = hub[index][name] || (hub[index][name] = []);
       // make sure the same handler is not added again
-      each(hub[args.path], function(handler) {
+      each(handlers, function(handler) {
         // if duplicate found, return false to break the each iterator
-        if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
+        if (handler.callback === callback && handler.context === context) {
+          // override once() if an on() is called
+          if (handler.once && !temporary) delete handler.once;
+          duplicate = true;
+          return false;
+        }
       });
       if (duplicate) return context;
-      if (!objectHas.call(hub, args.path)) hub[args.path] = [];
-      hub[args.path].push({ callback: args.callback, context: context });
+      handler = { callback: callback, context: context };
+      if (temporary) handler.once = true;
+      handlers.push(handler);
       // create responders for external events
-      respond(args.emitter, args.name, context, true);
+      respond(emitter, name, context, true);
       // check if cache should be cleared
-      if (args.emitter === cache.emitter) cache = {};
+      if (emitter === cache.emitter) cache = {};
       return context;
     }
+
 
     // example: context.once(emitter, name, callback)
     //          context.once(selector, name, callback)
     //          context.once(name, callback)
-    function once() {
-      var context = this
-        , args    = sanitize.call(context, arraySlice.call(arguments, 0))
-        , duplicate;
-      // make sure the same handler is not added again
-      each(hub[args.path], function(handler) {
-        // if duplicate found, return false to break the each iterator
-        if (handler.callback === args.callback && handler.context === context) { duplicate = true; return false; }
-      });
-      if (duplicate) return context;
-      var callback = function() {
-        context.off(args.emitter, args.name, callback);
-        args.callback.apply(context, arguments);
-      };
-      context.on(args.emitter, args.name, callback);
-      return context;
+    function once(emitter, name, callback) {
+      var context = this, index;
+      if (isFunction(name)) { callback = name; name = emitter; emitter = context; }
+      return context.on(emitter, name, callback, true);
     }
+
 
     // example: context.off(emitter, name, callback)
     //          context.off(selector, name, callback)
     //          context.off(name, callback)
+    //          context.off(emitter, callback)
+    //          context.off(selector, callback)
     //          context.off(name)
     //          context.off(selector)
     //          context.off(emitter)
     //          context.off()
-    function off() {
-      var context = this
-        , args    = sanitize.call(context, arraySlice.call(arguments, 0))
-        , hubKeys = keys(hub)
-        , exist
-        , name;
-      // remember, at this point an index is created for the emitter
-      // even if it doesn't have any listeners, but at the end we remove empty indices
-      // find all handlers keys starting with path, namespaced keys
-      filter(hubKeys, function(key) { return key === args.path || key.indexOf(args.path + '.') === 0; });
-      // find all callbacks to be removed
-      each(hubKeys, function(key) {
-        reject(hub[key], function(handler) { return args.callback ? handler.callback === args.callback : handler.context === context; });
-        if (!hub[key].length) delete hub[key];
-      });
+    function off(emitter, name, callback) {
+      var context = this, index, prefix, handlers;
+      // no arguments
+      if (!emitter && !name && !callback) { emitter = context; }
+      // single argument, its either selector or name, first check if its being handled by this context
+      else if (!name && !callback && isString(emitter) && handles.call(context, emitter)) { name = emitter; emitter = context; }
+      // two arguments, name or emitter, and callback
+      else if (isFunction(name)) {
+        callback = name;
+        if (isString(emitter) && handles.call(context, emitter)) { name = emitter; emitter = context; }
+        else { name = undefined; }
+      }
+      index = Index.get(emitter, 'events');
+      if (!hub[index]) return context;
+      if (name) {
+        // look for exact name handlers
+        handlers = hub[index][name];
+        if (handlers) {
+          reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
+          if (!handlers.length) delete hub[index][name];
+        }
+        // look for namespaced name handlers
+        prefix = name + '.';
+        each(hub[index], function(handlers, which) {
+          if (which.indexOf(prefix) === 0) {
+            reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
+            if (!handlers.length) delete hub[index][which];
+          }
+        });
+      } else {
+        each(hub[index], function(handlers, which) {
+          reject(handlers, function(handler) { return callback ? handler.callback === callback : handler.context === context; });
+          if (!handlers.length) delete hub[index][which];
+        });
+      }
       // check if cache should be cleared
-      if (args.emitter === cache.emitter) cache = {};
+      if (emitter === cache.emitter) cache = {};
       // check if any other handlers available for the emitter
       // if not, remove the emitter from indices
-      hubKeys = keys(hub);
-      each(hubKeys, function(key) { if (key.indexOf(args.index) === 0) { exist = true; return false; }});
-      if (!exist) delete indices[parseInt(args.index, 10)];
+      if (isEmpty(hub[index])) {
+        delete hub[index];
+        Index.remove(emitter, 'events');
+      }
       // remove responders for external events
-      respond(args.emitter, args.name, context, false);
+      respond(emitter, name, context, false);
       return context;
     }
+
 
     // example: context.trigger(emitter, name, parameters)
     //          context.trigger(selector, name, parameters)
     //          context.trigger(name, parameters)
     function trigger(emitter, name, parameters) {
-      var context = this, handlers, path, hubKeys;
-      if (isString(emitter)) { parameters = name; name = emitter; emitter = context; }
+      var context = this, index, triggers, prefix;
+      if (isObject(name) || (!name && !parameters)) { parameters = name; name = emitter; emitter = context; }
       // if its a cached trigger call, no need to find handlers
-      if (cache.emitter === emitter && cache.name === name) handlers = cache.handlers;
+      if (cache.emitter === emitter && cache.name === name) triggers = cache.triggers;
       else {
-        if (inArray(indices, emitter) === -1) return context;
-        handlers = [];
-        path = indexFor(indices, emitter) + (isString(name) ? '.' + name : '');
-        // add handlers for path
-        if (objectHas.call(hub, path)) handlers = handlers.concat(hub[path]);
-        // find handlers in namespaced paths
-        path = path + '.';
-        hubKeys = keys(hub);
-        filter(hubKeys, function(key) {
-          return key.indexOf(path) === 0;
-        });
-        each(hubKeys, function(key) {
-          handlers = handlers.concat(hub[key]);
-        });
+        index = Index.get(emitter, 'events');
+        if (!hub[index]) return context;
+        triggers = [];
+        // look for exact name handlers
+        if (hub[index][name]) triggers = triggers.concat(hub[index][name]);
+        // look for exact name handlers
+        prefix = name + '.';
+        each(hub[index], function(handlers, which) { if (which.indexOf(prefix) === 0) triggers = triggers.concat(handlers); });
         cache.emitter = emitter;
         cache.name = name;
-        cache.handlers = handlers;
+        cache.triggers = triggers;
       }
-      each(handlers, function(handler) { handler.callback.call(handler.context, parameters); });
+      each(triggers, function(handler) {
+        handler.callback.call(handler.context, parameters);
+        if (handler.once) off.call(handler.context, emitter, name, handler.callback);
+      });
       return context;
     }
 
+
     // to use the module as a behavior
-    Behaviors[name] = {
+    Behaviors[behavior] = {
 
       add: function() {
         var prototype   = this
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
-        if (constructor.check(name)) return prototype;
+        if (constructor.check(behavior)) return prototype;
         extend(prototype, { on: on, once: once, off: off, trigger: trigger });
-        behaviors.push(name);
+        behaviors.push(behavior);
         return prototype;
       },
 
@@ -397,17 +416,19 @@
         var prototype   = this
           , constructor = prototype.constructor
           , behaviors   = constructor.behaviors;
-        if (!constructor.check(name)) return prototype;
+        if (!constructor.check(behavior)) return prototype;
         prototype.off();
         extend(prototype, { on: undefined, once: undefined, off: undefined, trigger: undefined });
-        remove(behaviors, name);
+        remove(behaviors, behavior);
         return prototype;
       }
 
     };
 
+
     // public API
     return { on: on, once: once, off: off, trigger: trigger };
+
 
   })();
 

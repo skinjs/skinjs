@@ -35,7 +35,7 @@ define('responders/window', ['skin'], function(Skin) {
     // special case, when there's no name it means
     // all listeners for the specified context should be removed
     // this is when something like off(window) is used
-    if (!name.length) {
+    if (!name) {
       Tools.each(hub, function(handler, name) {
         // remove all context references from all handlers
         Tools.reject(handler.contexts, function(which) { return which === context; });

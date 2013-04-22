@@ -94,7 +94,7 @@ define('responders/pointer', ['skin'], function(Skin) {
 
   // remove listener
   function remove(element, name, context) {
-    if (!name.length) { clear(element, context); return; }
+    if (!name) { clear(element, context); return; }
     var type = events[name];
     if (type) {
       var index = Tools.indexFor(indices, element, false)
