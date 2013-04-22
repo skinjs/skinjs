@@ -99,21 +99,6 @@
         var keys = [];
         for (var key in object) if (objectHas.call(object, key)) keys.push(key);
         return keys;
-      }
-
-    // helper for indexing elements
-    // adds item, if not exists, at the first empty index
-    // returns the index of item
-    , indexFor = Tools.indexFor = function(array, item, insert) {
-        var empty = array.length;
-        for (var index = 0; index < array.length; index++) {
-          if (array[index] === item) return index;
-          if (array[index] === undefined) empty = index;
-        }
-        if (insert || isUndefined(insert)) {
-          array[empty] = item;
-          return empty;
-        } else return -1;
       };
 
 

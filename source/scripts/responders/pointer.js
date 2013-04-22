@@ -10,7 +10,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   // hooks for mouse, pen or touch events
   // supports pointerdown, pointerup, pointermove, pointercancel, pointerover, pointerout, pointerenter, pointerleave
 
-  var w = window, d = document, n = w.navigator, Tools = Skin.Tools, hub = {}, indices = [], events = {}
+  var w = window, d = document, n = w.navigator, Tools = Skin.Tools, Index = Skin.Index, hub = {}, events = {}
     , POINTER_DOWN   = 'pointerdown'
     , POINTER_UP     = 'pointerup'
     , POINTER_MOVE   = 'pointermove'
@@ -81,7 +81,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   function add(element, name, context) {
     var type = events[name];
     if (type) {
-      var index = Tools.indexFor(indices, element)
+      var index = Index.set(element, 'pointer')
         , handlers = hub[index] || (hub[index] = {});
       if (handlers[name]) {
         handlers[name].push(context);
@@ -97,7 +97,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     if (!name) { clear(element, context); return; }
     var type = events[name];
     if (type) {
-      var index = Tools.indexFor(indices, element, false)
+      var index = Index.get(element, 'pointer')
         , handlers = hub[index];
       if (handlers && handlers[name]) {
         Tools.remove(handlers[name], context);
@@ -108,7 +108,7 @@ define('responders/pointer', ['skin'], function(Skin) {
           // if not, remove the element from indices
           if (Tools.isEmpty(handlers)) {
             delete hub[index];
-            delete indices[index];
+            Index.remove(element, 'pointer');
           }
         }
       }
@@ -118,7 +118,7 @@ define('responders/pointer', ['skin'], function(Skin) {
   // clear off element, all handlers for the specified context should be removed
   // this is when something like context.off(element) was called
   function clear(element, context) {
-    var index = Tools.indexFor(indices, element, false)
+    var index = Index.get(element, 'pointer')
       , handlers = hub[index];
 
     if (handlers) Tools.each(handlers, function(contexts, name) {
@@ -130,7 +130,7 @@ define('responders/pointer', ['skin'], function(Skin) {
         // if not, remove the element from indices
         if (Tools.isEmpty(handlers)) {
           delete hub[index];
-          delete indices[index];
+          Index.remove(element, 'pointer');
         }
       }
     });
@@ -142,7 +142,7 @@ define('responders/pointer', ['skin'], function(Skin) {
       , source     = event.target
       , related    = event.relatedTarget
       , name       = events[event.type]
-      , index      = Tools.indexFor(indices, target, false)
+      , index      = Index.get(target, 'pointer')
       , handlers   = hub[index][name];
 
     // simulate pointerenter and pointerleave using pointerover and pointerout

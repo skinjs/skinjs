@@ -15,7 +15,7 @@ define('responders/gesture', ['skin'], function(Skin) {
   //          rotatestart, rotate, rotateend
   //          pinchstart, pinch, pinchend
 
-  var w = window, Tools = Skin.Tools, hub = {}, indices = [], upTimeout = 500, downTimeout = 1000, timeout = null, gesture = {}
+  var w = window, Tools = Skin.Tools, Index = Skin.Index, hub = {}, upTimeout = 500, downTimeout = 1000, timeout = null, gesture = {}
     , POINTER_DOWN   = 'pointerdown'
     , POINTER_UP     = 'pointerup'
     , POINTER_MOVE   = 'pointermove'
@@ -56,7 +56,7 @@ define('responders/gesture', ['skin'], function(Skin) {
     , PINCH_END      = 'pinchend';
 
   function add(element, name, context) {
-    var index = Tools.indexFor(indices, element)
+    var index = Index.set(element, 'gesture')
       , handlers = hub[index] || (hub[index] = {});
     if (handlers[name]) {
       handlers[name].push(context);
@@ -75,7 +75,7 @@ define('responders/gesture', ['skin'], function(Skin) {
 
   function remove(element, name, context) {
 //    if (!name.length) { clear(element, context); return; }
-    var index = Tools.indexFor(indices, element, false)
+    var index = Index.get(element, 'gesture')
       , handlers = hub[index];
     if (handlers && handlers[name]) {
       Tools.remove(handlers[name], context);
@@ -93,7 +93,7 @@ define('responders/gesture', ['skin'], function(Skin) {
         // if not, remove the element from indices
         if (Tools.isEmpty(handlers)) {
           delete hub[index];
-          delete indices[index];
+          Index.remove(element, 'gesture');
         }
       }
     }
@@ -102,7 +102,7 @@ define('responders/gesture', ['skin'], function(Skin) {
   function start(event) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source, false)
+      , index    = Index.get(source, 'gesture')
       , handlers = hub[index]
       , now      = Date.now()
       , delay;
@@ -139,7 +139,7 @@ define('responders/gesture', ['skin'], function(Skin) {
   function end(event) {
     var pointers = event.changedTouches || [event]
       , source   = pointers[0].target
-      , index    = Tools.indexFor(indices, source, false)
+      , index    = Index.get(source, 'gesture')
       , handlers = hub[index]
       , now      = Date.now()
       , delay;
