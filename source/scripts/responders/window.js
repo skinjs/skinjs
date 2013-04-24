@@ -10,7 +10,7 @@ define('responders/window', ['skin'], function(Skin) {
   // hooks for window events
   // supports resize, scroll, load, unload, hashchange
 
-  var w = window, d = document, e = d.documentElement, b = d.body, Tools = Skin.Tools, hub = {}, width, height, x, y;
+  var w = window, d = document, e = d.documentElement, b = d.body, Tools = Skin.Tools, hub = {}, width, height, left, top;
 
   function add(emitter, name, context) {
     // indices is not needed, because all events are window's
@@ -24,10 +24,10 @@ define('responders/window', ['skin'], function(Skin) {
     // so we can easily remove all bindings for a context
     // or remove the name from hub when there's no context listening
     hub[name] = { contexts: [context] , old: w['on' + name] };
-    w['on' + name] = function(event) {
-      handle(name);
+    w['on' + name] = function(e) {
+      handle(e);
       // calling the old handler
-      if (Tools.isFunction(hub[name].old)) hub[name].old();
+      if (Tools.isFunction(hub[name].old)) hub[name].old(e);
     };
   }
 
@@ -55,31 +55,31 @@ define('responders/window', ['skin'], function(Skin) {
     }
   }
 
-  function handle(name) {
-    switch (name) {
+  function handle(e) {
+    switch (e.type) {
 
       case 'resize':
-        width  = w.innerWidth  || e.clientWidth  || 0;
-        height = w.innerHeight || e.clientHeight || 0;
-        Skin.trigger(w, 'resize', { width: width, height: height });
+        width  = w.innerWidth  || e && e.clientWidth  || 0;
+        height = w.innerHeight || e && e.clientHeight || 0;
+        Skin.trigger(w, 'resize', { width: width, height: height, event: e });
       break;
 
       case 'scroll':
-        x = e.scrollLeft || b.scrollLeft || 0;
-        y = e.scrollTop  || b.scrollTop  || 0;
-        Skin.trigger(w, 'scroll', { x: x, y: y });
+        left = w.pageXOffset || e && e.scrollLeft || b && b.scrollLeft || 0;
+        top  = w.pageYOffset || e && e.scrollTop  || b && b.scrollTop  || 0;
+        Skin.trigger(w, 'scroll', { left: left, top: top, event: e });
       break;
 
       case 'load':
-        Skin.trigger(w, 'load');
+        Skin.trigger(w, 'load', { event: e });
       break;
 
       case 'unload':
-        Skin.trigger(w, 'unload');
+        Skin.trigger(w, 'unload', { event: e });
       break;
 
       case 'hashchange':
-        Skin.trigger(w, 'hashchange', { hash: w.location.hash });
+        Skin.trigger(w, 'hashchange', { hash: w.location.hash, event: e });
       break;
 
     }
