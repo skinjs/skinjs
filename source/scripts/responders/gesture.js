@@ -62,14 +62,10 @@ define('responders/gesture', ['skin'], function(Skin) {
       handlers[name].push(context);
     } else {
       handlers[name] = [context];
-      context.on(element, 'pointerdown', start);
-      context.on(element, 'pointerup', end);
-      context.on(element, 'pointercancel', cancel);
-      if (name == 'dragenter') context.on(element, 'pointerenter', enter);
-      else if (name == 'dragleave') context.on(element, 'pointerleave', leave);
-      else if (name == 'dragover') context.on(element, 'pointerenter', over);
-      else if (name == 'dragout') context.on(element, 'pointerenter', out);
-      else if (!/press$/.test(name)) context.on(element, 'pointermove', move);
+      context.on(element, POINTER_DOWN, start);
+      context.on(element, POINTER_UP, end);
+      context.on(element, POINTER_CANCEL, cancel);
+      if (!/press$/.test(name)) context.on(element, POINTER_MOVE, change);
     }
   }
 
@@ -80,14 +76,10 @@ define('responders/gesture', ['skin'], function(Skin) {
     if (handlers && handlers[name]) {
       Tools.remove(handlers[name], context);
       if (!handlers[name].length) {
-        context.off(element, 'pointerdown', start);
-        context.off(element, 'pointerup', end);
-        context.off(element, 'pointercancel', cancel);
-        if (name == 'dragenter') context.off(element, 'pointerenter', enter);
-        else if (name == 'dragleave') context.off(element, 'pointerleave', leave);
-        else if (name == 'dragover') context.off(element, 'pointerenter', over);
-        else if (name == 'dragout') context.off(element, 'pointerenter', out);
-        else if (!/press$/.test(name)) context.off(element, 'pointermove', move);
+        context.off(element, POINTER_DOWN, start);
+        context.off(element, POINTER_UP, end);
+        context.off(element, POINTER_CANCEL, cancel);
+        if (!/press$/.test(name)) context.off(element, POINTER_MOVE, change);
         delete handlers[name];
         // check if any other handlers available for the element
         // if not, remove the element from indices
@@ -104,8 +96,7 @@ define('responders/gesture', ['skin'], function(Skin) {
       , source   = pointers[0].target
       , index    = Index.get(source, namespace)
       , handlers = hub[index]
-      , now      = Date.now()
-      , delay;
+      , now      = Date.now();
 
     if (!handlers) return;
 
@@ -126,7 +117,7 @@ define('responders/gesture', ['skin'], function(Skin) {
 
       if (handlers[LONG_PRESS]) {
         if (!isControlPress(event)) {
-          if (timeout) w.clearTimeout(timeout);
+          w.clearTimeout(timeout);
           timeout = w.setTimeout(function() {
             trigger(handlers[LONG_PRESS], source, LONG_PRESS, event);
             timeout = null;
@@ -141,8 +132,7 @@ define('responders/gesture', ['skin'], function(Skin) {
       , source   = pointers[0].target
       , index    = Index.get(source, namespace)
       , handlers = hub[index]
-      , now      = Date.now()
-      , delay;
+      , now      = Date.now();
 
     if (!handlers) return;
 
@@ -163,26 +153,25 @@ define('responders/gesture', ['skin'], function(Skin) {
           w.clearTimeout(timeout);
           timeout = null;
         }
+
       }
     }
   }
 
-  function enter(event) {
-  }
+  function change(event) {
+    var pointers = event.changedTouches || [event]
+      , source   = pointers[0].target
+      , index    = Index.get(source, namespace)
+      , handlers = hub[index]
+      , now      = Date.now();
 
-  function leave(event) {
-  }
+    console.log(document.elementFromPoint(pointers[0].clientX, pointers[0].clientY));
 
-  function over(event) {
-  }
-
-  function out(event) {
-  }
-
-  function move(event) {
   }
 
   function cancel(event) {
+    w.clearTimeout(timeout);
+    timeout = null;
     gesture = {};
   }
 

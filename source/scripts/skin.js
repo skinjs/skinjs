@@ -191,7 +191,7 @@
     Window:   function(emitter, name, context) { return emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name); },
     Document: function(emitter, name, context) { return emitter === document && /^(contextmenu|ready)$/.test(name); },
     Keyboard: function(emitter, name, context) { return isElement(emitter) && /^key(press|up|down)/.test(name); },
-    Pointer:  function(emitter, name, context) { return isElement(emitter) && /^pointer(up|down|move|cancel|over|out|enter|leave)$/.test(name); },
+    Pointer:  function(emitter, name, context) { return isElement(emitter) && /^((got|lost)pointercapture|pointer(up|down|move|cancel|over|out|enter|leave))$/.test(name); },
     Gesture:  function(emitter, name, context) { return isElement(emitter) && /^((double|long|control){0,1}press|drop|drag(start|end|enter|leave|over|out){0,1}|(swipe|rotate|pinch)(start|end){0,1})$/.test(name); }
   }, function(check, name) {
     Responders[name] = { path: 'responders/' + name.toLowerCase(), check: check };
@@ -269,7 +269,7 @@
       each(handlers, function(handler) {
         // if duplicate found, return false to break the each iterator
         if (handler.callback === callback && handler.context === context) {
-          // override once() if an on() is called
+          // override once() if on() was called
           if (handler.once && !temporary) delete handler.once;
           duplicate = true;
           return false;
