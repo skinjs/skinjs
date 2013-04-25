@@ -104,9 +104,14 @@ define('responders/pointer', ['skin'], function(Skin) {
         handlers[name].push(context);
       } else {
         handlers[name] = [context];
-        element.addEventListener(type, handle, false);
         // check if we need to capture move on document, to simulate over, out, enter and leave for touch
-        if (/(over|out|enter|leave)$/.test(name) && /^touch/.test(events[POINTER_MOVE])) document.addEventListener(events[POINTER_MOVE], capture, true);
+        if (/(over|out|enter|leave)$/.test(name) && /^touch/.test(events[POINTER_MOVE])) {
+          if (!captured.count) {
+            captured.count = 1;
+            document.addEventListener(events[POINTER_MOVE], capture, true);
+          }
+          else captured.count++;
+        } else element.addEventListener(type, handle, false);
       }
     }
   }
@@ -122,8 +127,13 @@ define('responders/pointer', ['skin'], function(Skin) {
       if (handlers && handlers[name]) {
         Tools.remove(handlers[name], context);
         if (!handlers[name].length) {
-          element.removeEventListener(type, handle);
-          if (/(over|out|enter|leave)$/.test(name) && /^touch/.test(events[POINTER_MOVE])) document.removeEventListener(events[POINTER_MOVE], capture);
+          // simulated over, out, enter and leave for touch
+          if (/(over|out|enter|leave)$/.test(name) && /^touch/.test(events[POINTER_MOVE])) {
+            captured.count--;
+            if (!captured.count) {
+              document.removeEventListener(events[POINTER_MOVE], capture);
+            }
+          } else element.removeEventListener(type, handle);
           delete handlers[name];
           // check if any other handlers available for the element
           // if not, remove the element from indices
@@ -145,8 +155,13 @@ define('responders/pointer', ['skin'], function(Skin) {
     if (handlers) Tools.each(handlers, function(contexts, name) {
       Tools.reject(contexts, function(which) { return which === context; });
       if (!contexts.length) {
-        element.removeEventListener(events[name], handle);
-        if (/(over|out|enter|leave)$/.test(name) && /^touch/.test(events[POINTER_MOVE])) document.removeEventListener(events[POINTER_MOVE], capture);
+        // simulated over, out, enter and leave for touch
+        if (/(over|out|enter|leave)$/.test(name) && /^touch/.test(events[POINTER_MOVE])) {
+          captured.count--;
+          if (!captured.count) {
+            document.removeEventListener(events[POINTER_MOVE], capture);
+          }
+        } else element.removeEventListener(events[name], handle);
         delete handlers[name];
         // check if any other handlers available for the element
         // if not, remove the element from indices
