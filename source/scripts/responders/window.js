@@ -10,9 +10,9 @@ define('responders/window', ['skin'], function(Skin) {
   // hooks for window events
   // supports resize, scroll, load, unload, hashchange
 
-  var w = window, d = document, e = d.documentElement, b = d.body, Tools = Skin.Tools, hub = {}, width, height, left, top;
+  var w = window, d = document, e = d.documentElement, b = d.body, Tools = Skin.Tools, hub = {}, width, height, x, y;
 
-  function add(emitter, name, context) {
+  function on(emitter, name, context) {
     // indices is not needed, because all events are window's
     // existing handler
     if (hub[name]) {
@@ -31,7 +31,7 @@ define('responders/window', ['skin'], function(Skin) {
     };
   }
 
-  function remove(emitter, name, context) {
+  function off(emitter, name, context) {
     // special case, when there's no name it means
     // all listeners for the specified context should be removed
     // this is when something like off(window) is used
@@ -65,9 +65,9 @@ define('responders/window', ['skin'], function(Skin) {
       break;
 
       case 'scroll':
-        left = w.pageXOffset || e && e.scrollLeft || b && b.scrollLeft || 0;
-        top  = w.pageYOffset || e && e.scrollTop  || b && b.scrollTop  || 0;
-        Skin.trigger(w, 'scroll', { left: left, top: top, event: e });
+        x = w.pageXOffset || e && e.scrollLeft || b && b.scrollLeft || 0;
+        y = w.pageYOffset || e && e.scrollTop  || b && b.scrollTop  || 0;
+        Skin.trigger(w, 'scroll', { x: x, y: y, event: e });
       break;
 
       case 'load':
@@ -86,6 +86,6 @@ define('responders/window', ['skin'], function(Skin) {
   }
 
 
-  var Window = Tools.extend(Skin.Responders.Window, { add: add, remove: remove });
+  var Window = Tools.extend(Skin.Responders.Window, { on: on, off: off });
   return Window;
 });

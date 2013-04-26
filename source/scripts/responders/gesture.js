@@ -55,7 +55,7 @@ define('responders/gesture', ['skin'], function(Skin) {
     , PINCH_START    = 'pinchstart'
     , PINCH_END      = 'pinchend';
 
-  function add(element, name, context) {
+  function on(element, name, context) {
     var index = Index.set(element, namespace)
       , handlers = hub[index] || (hub[index] = {});
     if (handlers[name]) {
@@ -69,7 +69,7 @@ define('responders/gesture', ['skin'], function(Skin) {
     }
   }
 
-  function remove(element, name, context) {
+  function off(element, name, context) {
 //    if (!name.length) { clear(element, context); return; }
     var index = Index.get(element, namespace)
       , handlers = hub[index];
@@ -191,6 +191,6 @@ define('responders/gesture', ['skin'], function(Skin) {
 
 
 
-  var Gesture = Tools.extend(Skin.Responders.Gesture, { add: add, remove: remove });
+  var Gesture = Tools.extend(Skin.Responders.Gesture, { on: on, off: off });
   return Gesture;
 });

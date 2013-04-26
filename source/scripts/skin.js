@@ -11,7 +11,8 @@
   // Private Methods & Properties
   // ============================
   // existing Skin is kept as oldSkin, to be assigned back in noConflict()
-  var context = this, oldSkin = context.Skin, Tools, Index, Events, Behaviors, Responders, Skin;
+  var context = this, oldSkin = context.Skin, Tools, Index, Events, Behaviors, Responders, Skin
+    , w = window, d = document, n = w.navigator, e = d.documentElement, b = d.body;
 
 
 
@@ -38,6 +39,30 @@
     , isBoolean   = Tools.isBoolean   = function(symbol) { return typeof(symbol) === 'boolean'; }
     , isNumber    = Tools.isNumber    = function(symbol) { return typeof(symbol) === 'number'; }
     , isUndefined = Tools.isUndefined = function(symbol) { return symbol === undefined; }
+
+    // check if browser supports the event type
+    , isSupportedEvent = Tools.isSupportedEvent = function(type) {
+        var element = d.createElement('div'), flag;
+        type = 'on' + type.toLowerCase();
+        flag = (type in element);
+        if (!flag) {
+          element.setAttribute(type, 'return;');
+          flag = isFunction(element[type]);
+        }
+        element = null;
+        return flag;
+      }
+
+    // check if a DOM node contains other
+    , nodeContains = Tools.nodeContains = function(parent, child) {
+        if (!parent || !child) return false;
+        var pointer = child.parentNode;
+        while (pointer !== null) {
+          if (pointer === parent) return true;
+          pointer = pointer.parentNode;
+        }
+        return false;
+      }
 
     // iterator, breaks if any iteration returns false
     , each = Tools.each = function(symbol, iterator, context) {
@@ -188,8 +213,8 @@
 
   // register default responders
   each({
-    Window:   function(emitter, name, context) { return emitter === window && /^(resize|scroll|load|unload|hashchange)$/.test(name); },
-    Document: function(emitter, name, context) { return emitter === document && /^(contextmenu|ready)$/.test(name); },
+    Window:   function(emitter, name, context) { return emitter === w && /^(resize|scroll|load|unload|hashchange)$/.test(name); },
+    Document: function(emitter, name, context) { return emitter === d && /^(contextmenu|ready)$/.test(name); },
     Keyboard: function(emitter, name, context) { return isElement(emitter) && /^key(press|up|down)/.test(name); },
     Pointer:  function(emitter, name, context) { return isElement(emitter) && /^((got|lost)pointercapture|pointer(up|down|move|cancel|over|out|enter|leave))$/.test(name); },
     Gesture:  function(emitter, name, context) { return isElement(emitter) && /^((double|long|control){0,1}press|drop|drag(start|end|enter|leave|over|out){0,1}|(swipe|rotate|pinch)(start|end){0,1})$/.test(name); }
@@ -201,7 +226,7 @@
   function respond(emitter, name, context, flag) {
     if (!name && !flag) {
       // special case, remove form all available responders
-      each(Responders, function(Responder) { if (Responder.remove) Responder.remove(emitter, name, context); });
+      each(Responders, function(Responder) { if (Responder.off) Responder.off(emitter, name, context); });
       return;
     }
     // trim namespaced event name
@@ -211,9 +236,9 @@
         // matching responder
         Skin.require(Skin.pack, [Responder.path], function() {
           if (flag) {
-            Responder.add(emitter, name, context);
+            Responder.on(emitter, name, context);
             context.trigger('respond.' + responderName.toLowerCase());
-          } else Responder.remove(emitter, name, context);
+          } else Responder.off(emitter, name, context);
         });
       }
     });
