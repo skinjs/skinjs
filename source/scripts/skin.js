@@ -116,7 +116,7 @@
     // basic remove function, removes an item from array
     // this can be overridden by a sophisticated version later, via AMD
     , remove = Tools.remove = function(array, item) {
-        array.splice(inArray(array, item), 1);
+        if (isArray(array)) array.splice(inArray(array, item), 1);
       }
 
     // get array of keys in an object
