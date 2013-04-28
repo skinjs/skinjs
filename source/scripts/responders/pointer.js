@@ -9,11 +9,13 @@ define('responders/pointer', ['skin'], function(Skin) {
   // Pointer Responder Module
   // ========================
   // hooks for mouse, pen or touch events
-  // supports pointerdown, pointerup, pointermove, pointercancel, pointerover, pointerout, pointerenter, pointerleave
+  // supports pointerdown, pointerup, pointermove, pointercancel,
+  //          pointerover, pointerout, pointerenter, pointerleave,
+  //          gotpointercapture, lostpointercapture
 
 
   var namespace = 'pointer', w = window, d = document, n = w.navigator
-    , Tools = Skin.Tools, Index = Skin.Index, hub = {}, events = {}, captured = {}, tests = {}
+    , Tools = Skin.Tools, Index = Skin.Index, hub = {}, events = {}, captured, tests = {}, pointers = {}
 
     // string keys
     , MOUSE                   = 'mouse'
@@ -51,7 +53,14 @@ define('responders/pointer', ['skin'], function(Skin) {
     , MOUSE_OVER              = 'mouseover'
     , MOUSE_OUT               = 'mouseout'
     , MOUSE_ENTER             = 'mouseenter'
-    , MOUSE_LEAVE             = 'mouseleave';
+    , MOUSE_LEAVE             = 'mouseleave'
+
+    // test event type for detecting touch events
+    , TOUCH_TEST              = /^touch/
+    // test for pointerover, pointerout, pointerenter and pointerleave
+    // on a touch enabled device we have to simulate these by capturing
+    // touchmove on document and detecting the target element
+    , CAPTURE_TEST            = /(over|out|enter|leave)$/;
 
   // cache browser supported events mapped to pointer events and vice versa
   tests[POINTER_DOWN]         = [TOUCH_START,      MS_POINTER_DOWN,    MOUSE_DOWN];
@@ -102,15 +111,19 @@ define('responders/pointer', ['skin'], function(Skin) {
         handlers[name].push(context);
       } else {
         handlers[name] = [context];
-        if (/(over|out|enter|leave)$/.test(name) && events[TOUCH_MOVE]) {
-          if (!captured.count) {
-            captured.count = 1;
-            document.addEventListener(TOUCH_MOVE, capture, true);
-          } else captured.count++;
+        // check if we should capture touchmove on document,
+        // to figure pointerover, pointerout, pointerenter and pointerleave events
+        if (CAPTURE_TEST.test(name) && events[TOUCH_MOVE]) {
+          if (!captured) {
+            captured = 1;
+            d.addEventListener(TOUCH_MOVE, capture, true);
+          } else captured++;
         }
         Tools.each(types, function (type) {
-          if (type != MOUSE_ENTER || type != MOUSE_LEAVE) d.addEventListener(type, handle, false);
-          else element.addEventListener(type, handle, false);
+          // mouseenter and mouseleave are supported on Firefox and IE, and they don't bubble
+          // so we assign them to the element instead of delegating to document
+          if (type == MOUSE_ENTER || type == MOUSE_LEAVE) element.addEventListener(type, handle, false);
+          else d.addEventListener(type, handle, false);
         });
       }
     }
@@ -136,13 +149,14 @@ define('responders/pointer', ['skin'], function(Skin) {
   // refactored helper for off(), internal use only
   function remove(element, contexts, index, name) {
     if (!contexts.length) {
-      if (/(over|out|enter|leave)$/.test(name) && events[TOUCH_MOVE]) {
-        captured.count--;
-        if (!captured.count) d.removeEventListener(TOUCH_MOVE, capture);
+      // check if we should remove touchmove from document
+      if (CAPTURE_TEST.test(name) && events[TOUCH_MOVE]) {
+        captured--;
+        if (!captured) d.removeEventListener(TOUCH_MOVE, capture);
       }
       Tools.each(events[name], function (type) {
-        if (type != MOUSE_ENTER || type != MOUSE_LEAVE) d.removeEventListener(type, handle);
-        else element.removeEventListener(type, handle);
+        if (type == MOUSE_ENTER || type == MOUSE_LEAVE) element.removeEventListener(type, handle);
+        else d.removeEventListener(type, handle);
       });
       delete hub[index][name];
       // check if any other handlers available for the element
@@ -155,68 +169,120 @@ define('responders/pointer', ['skin'], function(Skin) {
   }
 
 
-  // captured move on document, find out when over, out, enter or leave happens
+  // captured touchmove on document
+  // find out when pointerover, pointerout, pointerenter or pointerleave happens
   function capture(e) {
-    var pointer = e.changedTouches && e.changedTouches[0] || e
-      , target  = d.elementFromPoint(pointer.clientX, pointer.clientY)
-      , index   = Index.get(target, namespace);
-    if (index !== -1) {
-      if (captured.target !== target) {
-        var handlers = hub[index];
-        if (captured.handlers) {
-          trigger(captured.handlers[POINTER_OUT], captured.target, POINTER_OUT, e);
-          if (!Tools.nodeContains(captured.target, target)) trigger(captured.handlers[POINTER_LEAVE], captured.target, POINTER_LEAVE, e);
+    var pointer    = e.changedTouches[e.changedTouches.length - 1]
+      , identifier = pointer.identifier;
+
+    if (!pointers[identifier].lock) {
+      var target, index;
+      // find out which element is under the finger
+      target = d.elementFromPoint(pointer.clientX, pointer.clientY);
+      if (target !== pointers[identifier].target) {
+        index = Index.get(pointers[identifier].target, namespace);
+        if (hub[index]) {
+          trigger(hub[index][POINTER_OUT], pointers[identifier].target, POINTER_OUT, pointers[identifier]);
+          if (hub[index][POINTER_LEAVE] && !Tools.nodeContains(pointers[identifier].target, target))
+            trigger(hub[index][POINTER_LEAVE], pointers[identifier].target, POINTER_LEAVE, pointers[identifier]);
         }
-        trigger(handlers[POINTER_OVER], target, POINTER_OVER, e);
-        if (!Tools.nodeContains(target, captured.target)) trigger(handlers[POINTER_ENTER], target, POINTER_ENTER, e);
-        captured.target   = target;
-        captured.handlers = handlers;
+        // new target index
+        index = Index.get(target, namespace);
+        if (hub[index]) {
+          trigger(hub[index][POINTER_OVER], target, POINTER_OVER, pointers[identifier]);
+          if (hub[index][POINTER_ENTER] && !Tools.nodeContains(target, pointers[identifier].target))
+            trigger(hub[index][POINTER_ENTER], target, POINTER_ENTER, pointers[identifier]);
+        }
+        pointers[identifier].target = target;
       }
-    } else {
-      if (captured.handlers) {
-        trigger(captured.handlers[POINTER_OUT], captured.target, POINTER_OUT, e);
-        trigger(captured.handlers[POINTER_LEAVE], captured.target, POINTER_LEAVE, e);
-      }
-      captured = {};
     }
   }
 
 
   // lock the pointer to an element
-  function setPointerCapture(target) {}
+  function setPointerCapture(target) {
+    
+  }
 
 
   // unlock the pointer from an element
-  function releasePointerCapture(target) {}
+  function releasePointerCapture(target) {
+    
+  }
 
 
   // handle pointer events
   function handle(e) {
-    var pointer
-      // target, which dispatched the event
-      , target   = e.target
-      , index    = Index.get(target, namespace)
-      , handlers = hub[index];
+    var pointer, identifier, name, target, index, handlers;
 
-    if (handlers) {
-      pointer = query(e);
+    // touchstart, touchmove, touchend and touchcancel
+    if (TOUCH_TEST.test(e.type)) {
+      pointer    = e.changedTouches[e.changedTouches.length - 1];
+      identifier = pointer.identifier;
+      name       = events[e.type];
+      target     = pointer.target;
+      index      = Index.get(target, namespace);
 
-      if (!captured.lock) {
-        captured.target = target;
-        captured.handlers = handlers;
+      // touchstart
+      if (name == POINTER_DOWN) {
+
+        pointers[identifier] = Tools.extend({}, pointer, {
+          lock: false,
+          pointers: pointers,
+          event: e
+        });
+
+        if (hub[index]) {
+          trigger(hub[index][POINTER_OVER], target, POINTER_OVER, pointers[identifier]);
+          trigger(hub[index][POINTER_ENTER], target, POINTER_ENTER, pointers[identifier]);
+          trigger(hub[index][POINTER_DOWN], target, POINTER_DOWN, pointers[identifier]);
+        }
+
+      // touchmove
+      } else if (name == POINTER_MOVE) {
+
+        if (hub[index]) {
+          trigger(hub[index][POINTER_MOVE], target, POINTER_MOVE, pointers[identifier]);
+        }
+
+      // touchend, touchcancel
+      } else {
+        index = Index.get(pointers[identifier].target, namespace);
+        if (hub[index]) {
+          trigger(hub[index][POINTER_UP], pointers[identifier].target, POINTER_UP, pointers[identifier]);
+          trigger(hub[index][POINTER_OUT], pointers[identifier].target, POINTER_OUT, pointers[identifier]);
+          trigger(hub[index][POINTER_LEAVE], pointers[identifier].target, POINTER_LEAVE, pointers[identifier]);
+        }
+        delete pointers[identifier];
+
       }
-
-      trigger(handlers[pointer.name], target, pointer.name, pointer);
-
-      // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
-      if ((pointer.name == POINTER_OVER && handlers[POINTER_ENTER]) &&
-          (!e.relatedTarget || (e.relatedTarget !== captured.target && !Tools.nodeContains(captured.target, e.relatedTarget))))
-            trigger(handlers[POINTER_ENTER], target, POINTER_ENTER, e);
-      if ((pointer.name == POINTER_OUT && handlers[POINTER_LEAVE]) &&
-          (!e.relatedTarget || (e.relatedTarget !== captured.target && !Tools.nodeContains(captured.target, e.relatedTarget))))
-            trigger(handlers[POINTER_LEAVE], target, POINTER_LEAVE, e);
-
     }
+
+    // if (handlers) {
+    //   prevent(e);
+    //   pointer = query(e);
+    //   pointer.id = e.pointerId || null;
+    //   pointer.lock   = setPointerCapture;
+    //   pointer.unlock = releasePointerCapture;
+    // 
+    //   console.log(e.type);
+    //   if (!captured.lock) {
+    //     captured.target = target;
+    //     captured.handlers = handlers;
+    //   }
+    // 
+    //   trigger(handlers[pointer.name], target, pointer.name, pointer);
+    // 
+    //   // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
+    //   if ((pointer.name == POINTER_OVER && !events[MOUSE_ENTER] && handlers[POINTER_ENTER]) &&
+    //       (!e.relatedTarget || (e.relatedTarget !== captured.target && !Tools.nodeContains(captured.target, e.relatedTarget))))
+    //         trigger(handlers[POINTER_ENTER], target, POINTER_ENTER, e);
+    //   if ((pointer.name == POINTER_OUT && !events[MOUSE_LEAVE] && handlers[POINTER_LEAVE]) &&
+    //       (!e.relatedTarget || (e.relatedTarget !== captured.target && !Tools.nodeContains(captured.target, e.relatedTarget))))
+    //         trigger(handlers[POINTER_LEAVE], target, POINTER_LEAVE, e);
+    // 
+    // }
+
 
     // if (target === currentTarget) {
     //   // fire pointerover and pointerenter before pointerdown, on touch devices
@@ -262,14 +328,13 @@ define('responders/pointer', ['skin'], function(Skin) {
         break;
       case e.MSPOINTER_TYPE_TOUCH:
         pointer.type = TOUCH;
-    } else pointer.type = /^touch/.test(e.type) ? TOUCH : MOUSE;
+    } else pointer.type = TOUCH_TEST.test(e.type) ? TOUCH : MOUSE;
 
     pointer.x = pointer.clientX = e.clientX;
     pointer.y = pointer.clientY = e.clientY;
     pointer.offsetX = e.offsetX;
     pointer.offsetY = e.offsetY;
 
-    pointer.target = e.target;
     pointer.data   = e.data;
     return pointer;
   }
