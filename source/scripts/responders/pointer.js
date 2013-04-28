@@ -15,7 +15,7 @@ define('responders/pointer', ['skin'], function(Skin) {
 
 
   var namespace = 'pointer', w = window, d = document, n = w.navigator
-    , Tools = Skin.Tools, Index = Skin.Index, hub = {}, events = {}, captured, tests = {}, pointers = {}
+    , Tools = Skin.Tools, Index = Skin.Index, hub = {}, events = {}, tests = {}, pointers = {}, captured
 
     // string keys
     , MOUSE                   = 'mouse'
@@ -84,7 +84,8 @@ define('responders/pointer', ['skin'], function(Skin) {
           events[name].push(type);
           events[type] = name;
           // Microsoft pointer model supports touch, mouse and pen
-          // so we don't need separate mouse events and we can break out here
+          // we don't need separate mouse events (last test arguments)
+          // so we can break out here
           if (n.msPointerEnabled) return false;
         }
       });
@@ -176,24 +177,31 @@ define('responders/pointer', ['skin'], function(Skin) {
       , identifier = pointer.identifier;
 
     if (!pointers[identifier].lock) {
-      var target, index;
-      // find out which element is under the finger
-      target = d.elementFromPoint(pointer.clientX, pointer.clientY);
-      if (target !== pointers[identifier].target) {
-        index = Index.get(pointers[identifier].target, namespace);
-        if (hub[index]) {
-          trigger(hub[index][POINTER_OUT], pointers[identifier].target, POINTER_OUT, pointers[identifier]);
-          if (hub[index][POINTER_LEAVE] && !Tools.nodeContains(pointers[identifier].target, target))
-            trigger(hub[index][POINTER_LEAVE], pointers[identifier].target, POINTER_LEAVE, pointers[identifier]);
+      var from = pointers[identifier].target
+        , to   = d.elementFromPoint(pointer.clientX, pointer.clientY);
+
+      if (from !== to) {
+        var fromIndex = Index.get(from, namespace)
+          , toIndex   = Index.get(to, namespace);
+
+        if (hub[fromIndex] || hub[toIndex]) {
+          pointers[identifier].from = from;
+          pointers[identifier].to = to;
         }
-        // new target index
-        index = Index.get(target, namespace);
-        if (hub[index]) {
-          trigger(hub[index][POINTER_OVER], target, POINTER_OVER, pointers[identifier]);
-          if (hub[index][POINTER_ENTER] && !Tools.nodeContains(target, pointers[identifier].target))
-            trigger(hub[index][POINTER_ENTER], target, POINTER_ENTER, pointers[identifier]);
+
+        if (hub[fromIndex]) {
+          Skin.trigger(from, POINTER_OUT, pointers[identifier]);
+          if (hub[fromIndex][POINTER_LEAVE] && !Tools.nodeContains(from, to))
+            Skin.trigger(from, POINTER_LEAVE, pointers[identifier]);
         }
-        pointers[identifier].target = target;
+
+        if (hub[toIndex]) {
+          Skin.trigger(to, POINTER_OVER, pointers[identifier]);
+          if (hub[toIndex][POINTER_ENTER] && !Tools.nodeContains(to, from))
+            Skin.trigger(to, POINTER_ENTER, pointers[identifier]);
+        }
+
+        pointers[identifier].target = to;
       }
     }
   }
@@ -223,38 +231,38 @@ define('responders/pointer', ['skin'], function(Skin) {
       target     = pointer.target;
       index      = Index.get(target, namespace);
 
-      // touchstart
+      // create pointer model on touchstart
       if (name == POINTER_DOWN) {
-
         pointers[identifier] = Tools.extend({}, pointer, {
           lock: false,
+          type: TOUCH,
           pointers: pointers,
           event: e
         });
+      }
 
-        if (hub[index]) {
-          trigger(hub[index][POINTER_OVER], target, POINTER_OVER, pointers[identifier]);
-          trigger(hub[index][POINTER_ENTER], target, POINTER_ENTER, pointers[identifier]);
-          trigger(hub[index][POINTER_DOWN], target, POINTER_DOWN, pointers[identifier]);
+      pointer = pointers[identifier];
+      index   = Index.get(pointer.target, namespace);
+      if (hub[index]) {
+        target = pointer.target;
+        switch (name) {
+          case POINTER_DOWN:
+            // touchstart
+            Skin.trigger(target, POINTER_OVER, pointer);
+            Skin.trigger(target, POINTER_ENTER, pointer);
+            Skin.trigger(target, POINTER_DOWN, pointer);
+            break;
+          case POINTER_MOVE:
+            // touchmove
+            Skin.trigger(target, POINTER_MOVE, pointer);
+            break;
+          default:
+            // touchend, touchcancel
+            Skin.trigger(target, POINTER_UP, pointer);
+            Skin.trigger(target, POINTER_OUT, pointer);
+            Skin.trigger(target, POINTER_LEAVE, pointer);
+            delete pointers[identifier];
         }
-
-      // touchmove
-      } else if (name == POINTER_MOVE) {
-
-        if (hub[index]) {
-          trigger(hub[index][POINTER_MOVE], target, POINTER_MOVE, pointers[identifier]);
-        }
-
-      // touchend, touchcancel
-      } else {
-        index = Index.get(pointers[identifier].target, namespace);
-        if (hub[index]) {
-          trigger(hub[index][POINTER_UP], pointers[identifier].target, POINTER_UP, pointers[identifier]);
-          trigger(hub[index][POINTER_OUT], pointers[identifier].target, POINTER_OUT, pointers[identifier]);
-          trigger(hub[index][POINTER_LEAVE], pointers[identifier].target, POINTER_LEAVE, pointers[identifier]);
-        }
-        delete pointers[identifier];
-
       }
     }
 
@@ -337,12 +345,6 @@ define('responders/pointer', ['skin'], function(Skin) {
 
     pointer.data   = e.data;
     return pointer;
-  }
-
-
-  // send message to all listening contexts
-  function trigger(handlers, target, name, event) {
-    Tools.each(handlers, function(context) { context.trigger(target, name, event); });
   }
 
 
