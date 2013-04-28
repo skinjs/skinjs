@@ -235,8 +235,14 @@ define('responders/pointer', ['skin'], function(Skin) {
               type: TOUCH,
               pointers: pointers,
               event: e,
-              lock: function() { pointer.locked = true; },
-              unlock: function() { pointer.locked = false; }
+              lock: function() {
+                pointer.locked = true;
+                Skin.trigger(target, GOT_POINTER_CAPTURE, pointer);
+              },
+              unlock: function() {
+                pointer.locked = false;
+                Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
+              }
             });
             Skin.trigger(target, POINTER_OVER, pointer);
             Skin.trigger(target, POINTER_ENTER, pointer);
@@ -248,6 +254,7 @@ define('responders/pointer', ['skin'], function(Skin) {
             break;
           default:
             // touchend, touchcancel
+            if (pointer.locked) Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
             Skin.trigger(target, POINTER_UP, pointer);
             Skin.trigger(target, POINTER_OUT, pointer);
             Skin.trigger(target, POINTER_LEAVE, pointer);
