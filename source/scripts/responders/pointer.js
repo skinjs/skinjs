@@ -176,7 +176,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     var pointer    = e.changedTouches[e.changedTouches.length - 1]
       , identifier = pointer.identifier;
 
-    if (!pointers[identifier].lock) {
+    if (!pointers[identifier].locked) {
       var from = pointers[identifier].target
         , to   = d.elementFromPoint(pointer.clientX, pointer.clientY);
 
@@ -207,18 +207,6 @@ define('responders/pointer', ['skin'], function(Skin) {
   }
 
 
-  // lock the pointer to an element
-  function setPointerCapture(target) {
-    
-  }
-
-
-  // unlock the pointer from an element
-  function releasePointerCapture(target) {
-    
-  }
-
-
   // handle pointer events
   function handle(e) {
     var pointer, identifier, name, target, index, handlers;
@@ -232,22 +220,24 @@ define('responders/pointer', ['skin'], function(Skin) {
       index      = Index.get(target, namespace);
 
       // create pointer model on touchstart
-      if (name == POINTER_DOWN) {
-        pointers[identifier] = Tools.extend({}, pointer, {
-          lock: false,
-          type: TOUCH,
-          pointers: pointers,
-          event: e
-        });
-      }
+      if (name == POINTER_DOWN) pointers[identifier] = Tools.extend({}, pointer);
 
       pointer = pointers[identifier];
       index   = Index.get(pointer.target, namespace);
+
       if (hub[index]) {
         target = pointer.target;
         switch (name) {
           case POINTER_DOWN:
             // touchstart
+            Tools.extend(pointer, {
+              locked: false,
+              type: TOUCH,
+              pointers: pointers,
+              event: e,
+              lock: function() { pointer.locked = true; },
+              unlock: function() { pointer.locked = false; }
+            });
             Skin.trigger(target, POINTER_OVER, pointer);
             Skin.trigger(target, POINTER_ENTER, pointer);
             Skin.trigger(target, POINTER_DOWN, pointer);
