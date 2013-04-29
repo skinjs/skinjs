@@ -212,7 +212,7 @@ define('responders/pointer', ['skin'], function(Skin) {
     var pointer, identifier, name, target, index, handlers;
 
     if (TOUCH_TEST.test(e.type)) {
-      // touchstart, touchmove, touchend and touchcancel
+      // touchstart, touchmove, touchend, touchcancel
 
       pointer    = e.changedTouches[e.changedTouches.length - 1];
       identifier = pointer.identifier;
@@ -263,9 +263,15 @@ define('responders/pointer', ['skin'], function(Skin) {
 
     } else if (n.msPointerEnabled) {
       // Microsoft pointer model
-      // MSPointerDown, MSPointerUp, MSPointerMove, MSPointerCancel, MSPointerOver, MSPointerOut
+      // MSPointerDown, MSPointerUp, MSPointerMove, MSPointerCancel,
+      // MSPointerOver, MSPointerOut, MSGotPointerCapture, MSLostPointerCapture
 
-      pointer = {};
+      name       = events[e.type];
+      target     = e.target;
+      index      = Index.get(target, namespace);
+      identifier = e.pointerId;
+
+      pointer = pointers[identifier] = {};
       switch (e.pointerType) {
         case e.MSPOINTER_TYPE_PEN:
           pointer.type = PEN;
@@ -277,10 +283,38 @@ define('responders/pointer', ['skin'], function(Skin) {
           pointer.type = TOUCH;
       }
 
-    } else {
-      // mousedown, mouseup, mousemove, mouseover, mouseout, mouseenter, mouseleave
+      Tools.extend(pointer, {
+        identifier: identifier,
+        target: e.target,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        offsetX: e.offsetX,
+        offsetY: e.offsetY,
+        screenX: e.screenX,
+        screenY: e.screenY,
+        pointers: pointers,
+        event: e,
+        lock: function() {
+          pointer.target.msSetPointerCapture(pointer.identifier);
+        },
+        unlock: function() {
+          pointer.target.msReleasePointerCapture(pointer.identifier);
+        }
+      });
 
-      name = events[e.type];
+      if (hub[index]) {
+        Skin.trigger(target, name, pointer);
+      }
+
+      if (name == POINTER_UP || name == POINTER_CANCEL) {
+        delete pointers[identifier];
+      }
+
+    } else {
+      // mousedown, mouseup, mousemove,
+      // mouseover, mouseout, mouseenter, mouseleave
+
+      name    = events[e.type];
 
       if (!pointers[MOUSE] || !pointers[MOUSE].locked) {
         target = e.target;
@@ -322,6 +356,7 @@ define('responders/pointer', ['skin'], function(Skin) {
         }
 
       } else {
+        // locked mouse events
         pointer = pointers[MOUSE];
         target  = pointer.target;
         index   = Index.get(target, namespace);
@@ -333,9 +368,7 @@ define('responders/pointer', ['skin'], function(Skin) {
           delete pointers[MOUSE];
         }
       }
-
     }
-
   }
 
 
