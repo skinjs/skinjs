@@ -211,13 +211,12 @@ define('responders/pointer', ['skin'], function(Skin) {
   function handle(e) {
     var pointer, identifier, name, target, index, handlers;
 
-    // touchstart, touchmove, touchend and touchcancel
     if (TOUCH_TEST.test(e.type)) {
+      // touchstart, touchmove, touchend and touchcancel
+
       pointer    = e.changedTouches[e.changedTouches.length - 1];
       identifier = pointer.identifier;
       name       = events[e.type];
-      target     = pointer.target;
-      index      = Index.get(target, namespace);
 
       // create pointer model on touchstart
       if (name == POINTER_DOWN) pointers[identifier] = Tools.extend({}, pointer);
@@ -261,87 +260,82 @@ define('responders/pointer', ['skin'], function(Skin) {
             delete pointers[identifier];
         }
       }
+
+    } else if (n.msPointerEnabled) {
+      // Microsoft pointer model
+      // MSPointerDown, MSPointerUp, MSPointerMove, MSPointerCancel, MSPointerOver, MSPointerOut
+
+      pointer = {};
+      switch (e.pointerType) {
+        case e.MSPOINTER_TYPE_PEN:
+          pointer.type = PEN;
+          break;
+        case e.MSPOINTER_TYPE_MOUSE:
+          pointer.type = MOUSE;
+          break;
+        case e.MSPOINTER_TYPE_TOUCH:
+          pointer.type = TOUCH;
+      }
+
+    } else {
+      // mousedown, mouseup, mousemove, mouseover, mouseout, mouseenter, mouseleave
+
+      name = events[e.type];
+
+      if (!pointers[MOUSE] || !pointers[MOUSE].locked) {
+        target = e.target;
+        index  = Index.get(target, namespace);
+
+        pointer = pointers[MOUSE] = {
+          identifier: MOUSE,
+          target: e.target,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          offsetX: e.offsetX,
+          offsetY: e.offsetY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          locked: false,
+          type: MOUSE,
+          pointers: pointers,
+          event: e,
+          lock: function() {
+            pointer.locked = true;
+            Skin.trigger(target, GOT_POINTER_CAPTURE, pointer);
+          },
+          unlock: function() {
+            pointer.locked = false;
+            Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
+          }
+        };
+
+        if (hub[index]) {
+          Skin.trigger(target, name, pointer);
+
+          // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
+          if ((name == POINTER_OVER && !events[MOUSE_ENTER] && hub[index][POINTER_ENTER]) &&
+              (!e.relatedTarget || (e.relatedTarget !== target && !Tools.nodeContains(target, e.relatedTarget))))
+                Skin.trigger(target, POINTER_ENTER, pointer);
+          if ((name == POINTER_OUT && !events[MOUSE_LEAVE] && hub[index][POINTER_LEAVE]) &&
+              (!e.relatedTarget || (e.relatedTarget !== target && !Tools.nodeContains(target, e.relatedTarget))))
+                Skin.trigger(target, POINTER_LEAVE, pointer);
+        }
+
+      } else {
+        pointer = pointers[MOUSE];
+        target  = pointer.target;
+        index   = Index.get(target, namespace);
+        if (name == POINTER_MOVE) {
+          Skin.trigger(target, POINTER_MOVE, pointer);
+        } else if (name == POINTER_UP) {
+          if (pointer.locked) Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
+          Skin.trigger(target, POINTER_UP, pointer);
+          delete pointers[MOUSE];
+        }
+      }
+
     }
 
-    // if (handlers) {
-    //   prevent(e);
-    //   pointer = query(e);
-    //   pointer.id = e.pointerId || null;
-    //   pointer.lock   = setPointerCapture;
-    //   pointer.unlock = releasePointerCapture;
-    // 
-    //   console.log(e.type);
-    //   if (!captured.lock) {
-    //     captured.target = target;
-    //     captured.handlers = handlers;
-    //   }
-    // 
-    //   trigger(handlers[pointer.name], target, pointer.name, pointer);
-    // 
-    //   // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
-    //   if ((pointer.name == POINTER_OVER && !events[MOUSE_ENTER] && handlers[POINTER_ENTER]) &&
-    //       (!e.relatedTarget || (e.relatedTarget !== captured.target && !Tools.nodeContains(captured.target, e.relatedTarget))))
-    //         trigger(handlers[POINTER_ENTER], target, POINTER_ENTER, e);
-    //   if ((pointer.name == POINTER_OUT && !events[MOUSE_LEAVE] && handlers[POINTER_LEAVE]) &&
-    //       (!e.relatedTarget || (e.relatedTarget !== captured.target && !Tools.nodeContains(captured.target, e.relatedTarget))))
-    //         trigger(handlers[POINTER_LEAVE], target, POINTER_LEAVE, e);
-    // 
-    // }
-
-
-    // if (target === currentTarget) {
-    //   // fire pointerover and pointerenter before pointerdown, on touch devices
-    //   if (name == POINTER_DOWN && type == TOUCH) {
-    //     trigger(handlers, target, POINTER_OVER, e);
-    //     trigger(handlers, target, POINTER_ENTER, e);
-    //     captured.target   = target;
-    //     captured.handlers = handlers;
-    //   }
-    // 
-    //   trigger(handlers, target, name, e);
-    // 
-    //   // fire pointerout and pointerleave after pointercancel or pointerup, on touch devices
-    //   if (name == POINTER_CANCEL || (name == POINTER_UP && type == TOUCH)) {
-    //     trigger(handlers, target, POINTER_OUT, e);
-    //     trigger(handlers, target, POINTER_LEAVE, e);
-    //     captured = {};
-    //   }
-    // }
-    // 
-    // // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
-    // if ((name == POINTER_OVER && events[POINTER_OVER] == events[POINTER_ENTER]) &&
-    //     (!relatedTarget || (relatedTarget !== currentTarget && !Tools.nodeContains(currentTarget, relatedTarget))))
-    //       trigger(handlers, target, POINTER_ENTER, e);
-    // if ((name == POINTER_OUT && events[POINTER_OUT] == events[POINTER_LEAVE]) &&
-    //     (!relatedTarget || (relatedTarget !== currentTarget && !Tools.nodeContains(currentTarget, relatedTarget))))
-    //       trigger(handlers, target, POINTER_LEAVE, e);
-
-  }
-
-
-  // extract useful information from event object
-  function query(e) {
-    var pointer = {};
-    pointer.name = events[e.type];
-    if (e.pointerType) switch (e.pointerType) {
-      // Microsoft pointer model
-      case e.MSPOINTER_TYPE_PEN:
-        pointer.type = PEN;
-        break;
-      case e.MSPOINTER_TYPE_MOUSE:
-        pointer.type = MOUSE;
-        break;
-      case e.MSPOINTER_TYPE_TOUCH:
-        pointer.type = TOUCH;
-    } else pointer.type = TOUCH_TEST.test(e.type) ? TOUCH : MOUSE;
-
-    pointer.x = pointer.clientX = e.clientX;
-    pointer.y = pointer.clientY = e.clientY;
-    pointer.offsetX = e.offsetX;
-    pointer.offsetY = e.offsetY;
-
-    pointer.data   = e.data;
-    return pointer;
   }
 
 
