@@ -57,6 +57,8 @@ define('responders/pointer', ['skin'], function(Skin) {
 
     // test event type for detecting touch events
     , TOUCH_TEST              = /^touch/
+    // test event type for detecting mouse events
+    , MOUSE_TEST              = /^mouse/
     // test for pointerover, pointerout, pointerenter and pointerleave
     // on a touch enabled device we have to simulate these by capturing
     // touchmove on document and detecting the target element
@@ -174,10 +176,11 @@ define('responders/pointer', ['skin'], function(Skin) {
   // find out when pointerover, pointerout, pointerenter or pointerleave happens
   function capture(e) {
     var pointer    = e.changedTouches[e.changedTouches.length - 1]
-      , identifier = pointer.identifier;
+      , identifier = pointer.identifier
+      , model      = pointers[identifier];
 
-    if (!pointers[identifier].locked) {
-      var from = pointers[identifier].target
+    if (!model.isLocked()) {
+      var from = model.target
         , to   = d.elementFromPoint(pointer.clientX, pointer.clientY);
 
       if (from !== to) {
@@ -185,23 +188,23 @@ define('responders/pointer', ['skin'], function(Skin) {
           , toIndex   = Index.get(to, namespace);
 
         if (hub[fromIndex] || hub[toIndex]) {
-          pointers[identifier].from = from;
-          pointers[identifier].to = to;
+          model.from = from;
+          model.to = to;
         }
 
         if (hub[fromIndex]) {
-          Skin.trigger(from, POINTER_OUT, pointers[identifier]);
+          Skin.trigger(from, POINTER_OUT, model);
           if (hub[fromIndex][POINTER_LEAVE] && !Tools.nodeContains(from, to))
-            Skin.trigger(from, POINTER_LEAVE, pointers[identifier]);
+            Skin.trigger(from, POINTER_LEAVE, model);
         }
 
         if (hub[toIndex]) {
-          Skin.trigger(to, POINTER_OVER, pointers[identifier]);
+          Skin.trigger(to, POINTER_OVER, model);
           if (hub[toIndex][POINTER_ENTER] && !Tools.nodeContains(to, from))
-            Skin.trigger(to, POINTER_ENTER, pointers[identifier]);
+            Skin.trigger(to, POINTER_ENTER, model);
         }
 
-        pointers[identifier].target = to;
+        model.target = to;
       }
     }
   }
@@ -209,163 +212,126 @@ define('responders/pointer', ['skin'], function(Skin) {
 
   // handle pointer events
   function handle(e) {
-    var pointer, identifier, name, target, index, handlers;
+    var pointer    = e.changedTouches ? e.changedTouches[e.changedTouches.length - 1] : e
+      , identifier = pointer.identifier || pointer.pointerId || MOUSE
+      , name       = events[e.type]
+      , target     = pointer.target
+      , model      = pointers[identifier]
+      , index;
 
-    if (TOUCH_TEST.test(e.type)) {
-      // touchstart, touchmove, touchend, touchcancel
+    // create pointer model if it doesn't exist
+    if (!model) {
 
-      pointer    = e.changedTouches[e.changedTouches.length - 1];
-      identifier = pointer.identifier;
-      name       = events[e.type];
+      // basic information
+      model = pointers[identifier] = {
+        identifier : identifier,
+        pointers   : pointers,
+        target     : target
+      };
 
-      // create pointer model on touchstart
-      if (name == POINTER_DOWN) pointers[identifier] = Tools.extend({}, pointer);
+      // find out the pointer type
+      if (e.pointerType) switch (e.pointerType) {
+        // Microsoft pointer model
+        case e.MSPOINTER_TYPE_PEN:
+          model.type = PEN;
+          break;
+        case e.MSPOINTER_TYPE_MOUSE:
+          model.type = MOUSE;
+          break;
+        case e.MSPOINTER_TYPE_TOUCH:
+          model.type = TOUCH;
+      } else model.type = TOUCH_TEST.test(e.type) ? TOUCH : MOUSE;
 
-      pointer = pointers[identifier];
-      index   = Index.get(pointer.target, namespace);
+      // assign lock() and unlock() methods
+      if (n.msPointerEnabled) {
+        // Microsoft pointer model already has native methods for this
+        model.lock     = function() { model.target.msSetPointerCapture(model.identifier); };
+        model.unlock   = function() { model.target.msReleasePointerCapture(model.identifier); };
+        model.isLocked = function() { return model.target.msGetPointerCapture(model.identifier) ? true : false; };
+      } else {
+        // simulate, isLocked() is used in capture() method, captured touchmove on document
+        model.locked   = false;
+        model.lock     = function() {
+          model.locked = true;
+          Skin.trigger(model.target, GOT_POINTER_CAPTURE, model);
+        };
+        model.unlock   = function() {
+          model.locked = false;
+          Skin.trigger(model.target, LOST_POINTER_CAPTURE, model);
+        };
+        model.isLocked = function() { return model.locked; };
+      }
 
-      if (hub[index]) {
-        target = pointer.target;
+    }
+
+    // update pointer model
+    Tools.extend(model, {
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+      offsetX: pointer.offsetX,
+      offsetY: pointer.offsetY,
+      screenX: pointer.screenX,
+      screenY: pointer.screenY
+    });
+    model.event = e;
+
+    // set correct target for mouse
+    if (MOUSE_TEST.test(e.type) && !model.isLocked()) model.target = target;
+
+    index = Index.get(model.target, namespace);
+    if (hub[index]) {
+
+      // trigger events
+      if (TOUCH_TEST.test(e.type)) {
+        // touchstart, touchmove, touchend, touchcancel
         switch (name) {
           case POINTER_DOWN:
             // touchstart
-            Tools.extend(pointer, {
-              locked: false,
-              type: TOUCH,
-              pointers: pointers,
-              event: e,
-              lock: function() {
-                pointer.locked = true;
-                Skin.trigger(target, GOT_POINTER_CAPTURE, pointer);
-              },
-              unlock: function() {
-                pointer.locked = false;
-                Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
-              }
-            });
-            Skin.trigger(target, POINTER_OVER, pointer);
-            Skin.trigger(target, POINTER_ENTER, pointer);
-            Skin.trigger(target, POINTER_DOWN, pointer);
+            Skin.trigger(model.target, POINTER_OVER, model);
+            Skin.trigger(model.target, POINTER_ENTER, model);
+            Skin.trigger(model.target, POINTER_DOWN, model);
             break;
           case POINTER_MOVE:
             // touchmove
-            Skin.trigger(target, POINTER_MOVE, pointer);
+            Skin.trigger(model.target, POINTER_MOVE, model);
             break;
           default:
             // touchend, touchcancel
-            if (pointer.locked) Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
-            Skin.trigger(target, POINTER_UP, pointer);
-            Skin.trigger(target, POINTER_OUT, pointer);
-            Skin.trigger(target, POINTER_LEAVE, pointer);
+            if (model.isLocked()) Skin.trigger(model.target, LOST_POINTER_CAPTURE, model);
+            Skin.trigger(model.target, POINTER_UP, model);
+            Skin.trigger(model.target, POINTER_OUT, model);
+            Skin.trigger(model.target, POINTER_LEAVE, model);
             delete pointers[identifier];
         }
-      }
+      } else if (n.msPointerEnabled) {
+        // Microsoft pointer model
+        // MSPointerDown, MSPointerUp, MSPointerMove, MSPointerCancel,
+        // MSPointerOver, MSPointerOut, MSGotPointerCapture, MSLostPointerCapture
 
-    } else if (n.msPointerEnabled) {
-      // Microsoft pointer model
-      // MSPointerDown, MSPointerUp, MSPointerMove, MSPointerCancel,
-      // MSPointerOver, MSPointerOut, MSGotPointerCapture, MSLostPointerCapture
-
-      name       = events[e.type];
-      target     = e.target;
-      index      = Index.get(target, namespace);
-      identifier = e.pointerId;
-
-      pointer = pointers[identifier] = {};
-      switch (e.pointerType) {
-        case e.MSPOINTER_TYPE_PEN:
-          pointer.type = PEN;
-          break;
-        case e.MSPOINTER_TYPE_MOUSE:
-          pointer.type = MOUSE;
-          break;
-        case e.MSPOINTER_TYPE_TOUCH:
-          pointer.type = TOUCH;
-      }
-
-      Tools.extend(pointer, {
-        identifier: identifier,
-        target: e.target,
-        clientX: e.clientX,
-        clientY: e.clientY,
-        offsetX: e.offsetX,
-        offsetY: e.offsetY,
-        screenX: e.screenX,
-        screenY: e.screenY,
-        pointers: pointers,
-        event: e,
-        lock: function() {
-          pointer.target.msSetPointerCapture(pointer.identifier);
-        },
-        unlock: function() {
-          pointer.target.msReleasePointerCapture(pointer.identifier);
-        }
-      });
-
-      if (hub[index]) {
-        Skin.trigger(target, name, pointer);
-      }
-
-      if (name == POINTER_UP || name == POINTER_CANCEL) {
-        delete pointers[identifier];
-      }
-
-    } else {
-      // mousedown, mouseup, mousemove,
-      // mouseover, mouseout, mouseenter, mouseleave
-
-      name    = events[e.type];
-
-      if (!pointers[MOUSE] || !pointers[MOUSE].locked) {
-        target = e.target;
-        index  = Index.get(target, namespace);
-
-        pointer = pointers[MOUSE] = {
-          identifier: MOUSE,
-          target: e.target,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          offsetX: e.offsetX,
-          offsetY: e.offsetY,
-          screenX: e.screenX,
-          screenY: e.screenY,
-          locked: false,
-          type: MOUSE,
-          pointers: pointers,
-          event: e,
-          lock: function() {
-            pointer.locked = true;
-            Skin.trigger(target, GOT_POINTER_CAPTURE, pointer);
-          },
-          unlock: function() {
-            pointer.locked = false;
-            Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
-          }
-        };
-
-        if (hub[index]) {
-          Skin.trigger(target, name, pointer);
-
-          // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
-          if ((name == POINTER_OVER && !events[MOUSE_ENTER] && hub[index][POINTER_ENTER]) &&
-              (!e.relatedTarget || (e.relatedTarget !== target && !Tools.nodeContains(target, e.relatedTarget))))
-                Skin.trigger(target, POINTER_ENTER, pointer);
-          if ((name == POINTER_OUT && !events[MOUSE_LEAVE] && hub[index][POINTER_LEAVE]) &&
-              (!e.relatedTarget || (e.relatedTarget !== target && !Tools.nodeContains(target, e.relatedTarget))))
-                Skin.trigger(target, POINTER_LEAVE, pointer);
-        }
 
       } else {
-        // locked mouse events
-        pointer = pointers[MOUSE];
-        target  = pointer.target;
-        index   = Index.get(target, namespace);
-        if (name == POINTER_MOVE) {
-          Skin.trigger(target, POINTER_MOVE, pointer);
-        } else if (name == POINTER_UP) {
-          if (pointer.locked) Skin.trigger(target, LOST_POINTER_CAPTURE, pointer);
-          Skin.trigger(target, POINTER_UP, pointer);
-          delete pointers[MOUSE];
+        // mousedown, mouseup, mousemove,
+        // mouseover, mouseout, mouseenter, mouseleave
+
+        if (model.isLocked()) {
+          // locked mouse events
+          if (name == POINTER_MOVE) {
+            Skin.trigger(model.target, POINTER_MOVE, model);
+          } else if (name == POINTER_UP) {
+            Skin.trigger(model.target, LOST_POINTER_CAPTURE, model);
+            Skin.trigger(model.target, POINTER_UP, model);
+            delete pointers[MOUSE];
+          }
+        } else {
+          // regular mouse events
+          Skin.trigger(target, name, model);
+          // simulate pointerenter and pointerleave using pointerover and pointerout, if they are not supported
+          if ((name == POINTER_OVER && !events[MOUSE_ENTER]) &&
+              (!e.relatedTarget || (e.relatedTarget !== target && !Tools.nodeContains(target, e.relatedTarget))))
+                Skin.trigger(target, POINTER_ENTER, model);
+          if ((name == POINTER_OUT && !events[MOUSE_LEAVE]) &&
+              (!e.relatedTarget || (e.relatedTarget !== target && !Tools.nodeContains(target, e.relatedTarget))))
+                Skin.trigger(target, POINTER_LEAVE, model);
         }
       }
     }
